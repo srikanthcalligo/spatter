@@ -1,0 +1,62 @@
+Steps to compile and run the spatter application:
+*************************************************
+
+Step 0 : Update cmake version to 3.25 or above
+         cd /home/user/tt-metal
+         cmake -B build_v1 -G Ninja
+         ninja build -C build_v1
+         ninja tests -C build_v1
+
+step 1 : Change directoy to 
+         cd /home/user/tt-metal/tt_metal/programming_examples
+Step 2 : Clone the Spatter repository
+
+Step 3 : Add the following lines to /home/user/tt-metal/tt_metal/programming_examples/CMakeLists.txt
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/spatter) #Added by Calligo , To build spatter library
+        add_custom_target(programming_examples DEPENDS profiler_examples contributed spatter ${PROGRAMMING_EXAMPLES_TEST_TARGETS})
+
+Step 4 : Change the following configuration settings for different runs in spatter/src/Spatter/CMakeLists.txt file
+        #Added by Calligo
+        # To run on TT riscv engine with single core, Comment below line to run Spatter on the HOST,  
+        add_definitions(-DTT_SPATTER_ENABLE -DSPATTER_RISCV_KERNEL)
+
+        # Uncomment below line for multicore version and comment the above line (-DTT_SPATTER_ENABLE)
+        #add_definitions(-DTT_SPATTER_PARALLEL_ENABLE -DSPATTER_RISCV_KERNEL_PARALLEL)
+
+Step 5 : Recompile tt-metal
+        cd /home/user/tt-metal
+        ninja tests -C build_v1
+
+Step 6 : Run the following test cases
+        cd /home/user/tt-metal
+        Scatter_Gather Test
+        *******************
+        ./build_v1/programming_examples/spatter/programming_examples/spatter/spatter1 -k sg -g 1 -u 1 -pUNIFORM:8:1 -l $((2**24))
+        Gather Test
+        ***********
+        ./build_v1/programming_examples/spatter/programming_examples/spatter/spatter1 -k gather -pUNIFORM:8:1 -l $((2**24))
+        Scatter_Test
+        ************
+        ./build_v1/programming_examples/spatter/programming_examples/spatter/spatter1 -k scatter -pUNIFORM:8:1 -l $((2**24))
+        multi_gather Test
+        *****************
+        ./build_v1/programming_examples/spatter/programming_examples/spatter/spatter1 -k multigather -g 1 -u 1 -pUNIFORM:8:1 -l $((2**24))
+        multi_scatter Test
+        ******************
+        ./build_v1/programming_examples/spatter/programming_examples/spatter/spatter1 -k multiscatter -g 1 -u 1 -pUNIFORM:8:1 -l $((2**24))
+
+Step 7 : To run multicore version of the kernel, please follow the instructions below
+        1. Change the following configuration settings in spatter/src/Spatter/CMakeLists.txt file
+        
+          #Added by Calligo
+          # To run on TT riscv engine with single core, Comment below line to run Spatter on the HOST,  
+          #add_definitions(-DTT_SPATTER_ENABLE -DSPATTER_RISCV_KERNEL)
+  
+          # Uncomment below line for multicore version and comment the above line (-DTT_SPATTER_ENABLE)
+          add_definitions(-DTT_SPATTER_PARALLEL_ENABLE -DSPATTER_RISCV_KERNEL_PARALLEL)
+        2. Recompile the library 
+          cd /home/user/tt-metal
+          ninja tests -C build_v1
+        3. Run scatter(Enabled support) test
+          ./build_v1/programming_examples/spatter/programming_examples/spatter/spatter1 -k scatter -pUNIFORM:8:1 -l $((2**24))
+        
