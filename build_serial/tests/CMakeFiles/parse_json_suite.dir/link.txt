@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/parse_json_suite.dir/parse_json_suite.cc.o -o parse_json_suite  ../src/Spatter/libSpatter.a

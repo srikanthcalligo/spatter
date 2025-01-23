@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/parse_random_suite.dir/parse_random_suite.cc.o -o parse_random_suite  ../src/Spatter/libSpatter.a

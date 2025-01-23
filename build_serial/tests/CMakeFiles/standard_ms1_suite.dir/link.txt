@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/standard_ms1_suite.dir/standard_ms1_suite.cc.o -o standard_ms1_suite  ../src/Spatter/libSpatter.a

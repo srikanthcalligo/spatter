@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/standard_suite_cpu.dir/standard_suite_cpu.cc.o -o standard_suite_cpu  ../src/Spatter/libSpatter.a

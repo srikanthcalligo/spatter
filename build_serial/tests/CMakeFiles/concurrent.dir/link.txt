@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/concurrent.dir/concurrent.cc.o -o concurrent  ../src/Spatter/libSpatter.a

@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG "CMakeFiles/binary-trace.dir/binary-trace.cc.o" -o binary-trace  ../src/Spatter/libSpatter.a

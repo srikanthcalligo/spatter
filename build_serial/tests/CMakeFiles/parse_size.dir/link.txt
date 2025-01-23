@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/parse_size.dir/parse_size.cc.o -o parse_size  ../src/Spatter/libSpatter.a

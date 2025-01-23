@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/parse_custom_suite.dir/parse_custom_suite.cc.o -o parse_custom_suite  ../src/Spatter/libSpatter.a
