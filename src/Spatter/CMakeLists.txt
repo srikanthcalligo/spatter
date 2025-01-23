@@ -2,7 +2,7 @@
 
 #Added by Calligo
 # To run on TT riscv engine with single core, Comment below line to run Spatter on the HOST,  
-#add_definitions(-DTT_SPATTER_ENABLE -DSPATTER_RISCV_KERNEL)
+add_definitions(-DTT_SPATTER_ENABLE -DSPATTER_RISCV_KERNEL)
 
 # Uncomment below line for multicore version and comment the above line (-DTT_SPATTER_ENABLE)
 #add_definitions(-DTT_SPATTER_PARALLEL_ENABLE -DSPATTER_RISCV_KERNEL_PARALLEL)
