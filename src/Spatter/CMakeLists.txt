@@ -1,7 +1,7 @@
 # Spatter/src/Spatter/CMakeLists.txt
 
 #Added by Calligo
-# To run on TT riscv engine with single core, Comment below line to run Spatter on the HOST,  
+# It will run on TT riscv engine with single core, Comment below line to run Spatter on the HOST  
 add_definitions(-DTT_SPATTER_ENABLE -DSPATTER_RISCV_KERNEL)
 
 # Uncomment below line for multicore version and comment the above line (-DTT_SPATTER_ENABLE)
