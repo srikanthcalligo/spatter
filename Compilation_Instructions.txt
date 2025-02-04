@@ -4,7 +4,7 @@ Steps to compile and run the spatter application:
 Step 0 : Update cmake version to 3.25 or above
          cd /home/user/tt-metal
          cmake -B build_v1 -G Ninja
-         ninja build -C build_v1
+         ninja install -C build_v1
          ninja tests -C build_v1
 
 step 1 : Change directoy to 
