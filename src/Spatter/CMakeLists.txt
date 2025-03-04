@@ -1,44 +1,70 @@
 # Spatter/src/Spatter/CMakeLists.txt
 
-#Added by Calligo
-# It will run on TT riscv engine with single core, Comment below line to run Spatter on the HOST  
-add_definitions(-DTT_SPATTER_ENABLE -DSPATTER_RISCV_KERNEL)
-
-# Uncomment below line for multicore version and comment the above line (-DTT_SPATTER_ENABLE)
-#add_definitions(-DTT_SPATTER_PARALLEL_ENABLE -DSPATTER_RISCV_KERNEL_PARALLEL)
-
 if (USE_CUDA)
     add_library(cuda_backend SHARED CudaBackend.cu)
     set_target_properties(cuda_backend PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
     set(CUDA_INCLUDE_FILES CudaBackend.hh)
 endif()
 
-set(SPATTER_INCLUDE_FILES
-    ${CUDA_INCLUDE_FILES}
-    Configuration.hh
-    Input.hh
-    JSONParser.hh
-    PatternParser.hh
-    SpatterTypes.hh
-    AlignedAllocator.hh
-    Timer.hh
-    )
 
-add_library(Spatter STATIC
-    ${SPATTER_INCLUDE_FILES}
-    Configuration.cc
-    JSONParser.cc
-    PatternParser.cc
-    Timer.cc
-    )
+if (USE_TT_METAL)
+    set(SPATTER_INCLUDE_FILES
+        ${CUDA_INCLUDE_FILES}
+        Configuration.hh
+        Input.hh
+        JSONParser.hh
+        PatternParser.hh
+        SpatterTypes.hh
+        AlignedAllocator.hh
+        Timer.hh
+        MetaliumBackend.hh
+        )
 
-add_library(Spatter_shared SHARED
-    ${SPATTER_INCLUDE_FILES}
-    Configuration.cc
-    JSONParser.cc
-    PatternParser.cc
-    Timer.cc
-    )
+    add_library(Spatter STATIC
+        ${SPATTER_INCLUDE_FILES}
+        MetaliumBackend.cc
+        Configuration.cc
+        JSONParser.cc
+        PatternParser.cc
+        Timer.cc
+        )
+
+    add_library(Spatter_shared SHARED
+        ${SPATTER_INCLUDE_FILES}
+        Configuration.cc
+        JSONParser.cc
+        PatternParser.cc
+        Timer.cc
+        MetaliumBackend.cc
+        )
+else()
+    set(SPATTER_INCLUDE_FILES
+        ${CUDA_INCLUDE_FILES}
+        Configuration.hh
+        Input.hh
+        JSONParser.hh
+        PatternParser.hh
+        SpatterTypes.hh
+        AlignedAllocator.hh
+        Timer.hh
+        )
+
+    add_library(Spatter STATIC
+        ${SPATTER_INCLUDE_FILES}
+        Configuration.cc
+        JSONParser.cc
+        PatternParser.cc
+        Timer.cc
+        )
+
+    add_library(Spatter_shared SHARED
+        ${SPATTER_INCLUDE_FILES}
+        Configuration.cc
+        JSONParser.cc
+        PatternParser.cc
+        Timer.cc
+        )
+endif()
 
 set_target_properties(Spatter PROPERTIES
     COMPILE_DEFINITIONS "${COMMON_COMPILE_DEFINITIONS}"
@@ -50,48 +76,85 @@ set_target_properties(Spatter_shared PROPERTIES
     OUTPUT_NAME "Spatter"
     )
 #COMPILE_OPTIONS "${COMMON_COMPILE_OPTIONS}"
-target_include_directories(Spatter
-    PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include/Spatter>
-    PRIVATE
-                ${UMD_HOME}
-                ${PROJECT_SOURCE_DIR}
-                ${PROJECT_SOURCE_DIR}/tt_metal
-                ${PROJECT_SOURCE_DIR}/tt_metal/common
-)
 
-target_include_directories(Spatter_shared
-    PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include/Spatter>
-    PRIVATE
-                ${UMD_HOME}
-                ${PROJECT_SOURCE_DIR}
-                ${PROJECT_SOURCE_DIR}/tt_metal
-                ${PROJECT_SOURCE_DIR}/tt_metal/common
-    )
+# TT-Metalium : Add include dependencies
+if (USE_TT_METAL)
+	target_include_directories(Spatter
+		PUBLIC
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+		$<INSTALL_INTERFACE:include/Spatter>
+		PRIVATE
+		            ${UMD_HOME}
+		            ${PROJECT_SOURCE_DIR}
+		            ${PROJECT_SOURCE_DIR}/tt_metal
+		            ${PROJECT_SOURCE_DIR}/tt_metal/common
+	)
+
+	target_include_directories(Spatter_shared
+		PUBLIC
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+		$<INSTALL_INTERFACE:include/Spatter>
+		PRIVATE
+		            ${UMD_HOME}
+		            ${PROJECT_SOURCE_DIR}
+		            ${PROJECT_SOURCE_DIR}/tt_metal
+		            ${PROJECT_SOURCE_DIR}/tt_metal/common
+		)
+else()
+	target_include_directories(Spatter
+		PUBLIC
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+		$<INSTALL_INTERFACE:include/Spatter>
+		PRIVATE
+		            ${UMD_HOME}
+		            ${PROJECT_SOURCE_DIR}
+		            ${PROJECT_SOURCE_DIR}/tt_metal
+		            ${PROJECT_SOURCE_DIR}/tt_metal/common
+	)
+
+	target_include_directories(Spatter_shared
+		PUBLIC
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+		$<INSTALL_INTERFACE:include/Spatter>
+		PRIVATE
+		            ${UMD_HOME}
+		            ${PROJECT_SOURCE_DIR}
+		            ${PROJECT_SOURCE_DIR}/tt_metal
+		            ${PROJECT_SOURCE_DIR}/tt_metal/common
+		)	
+endif()
 
 if (USE_CUDA)
     set(COMMON_LINK_LIBRARIES ${COMMON_LINK_LIBRARIES} cuda_backend)
 endif()
 
-target_link_libraries(Spatter
-    PUBLIC
-    ${COMMON_LINK_LIBRARIES}
-    tt_metal
-    m
-    pthread
-    )
-
-target_link_libraries(Spatter_shared
-    PUBLIC
-    ${COMMON_LINK_LIBRARIES}
-    tt_metal
-    m
-    pthread
-    )
-
+# TT-Metalium : Add linker dependencies
+if (USE_TT_METAL)
+	target_link_libraries(Spatter
+		PUBLIC
+		${COMMON_LINK_LIBRARIES}
+		tt_metal
+		m
+		pthread
+		)
+    target_link_libraries(Spatter_shared
+        PUBLIC
+        ${COMMON_LINK_LIBRARIES}
+        tt_metal
+        m
+        pthread
+        )
+else()
+	target_link_libraries(Spatter
+		PUBLIC
+		${COMMON_LINK_LIBRARIES}
+		)
+    target_link_libraries(Spatter_shared
+        PUBLIC
+        ${COMMON_LINK_LIBRARIES}
+        )
+endif()
+    
 #target_compile_options(Spatter
 #    PRIVATE ${WARNING_FLAGS}
 #    )

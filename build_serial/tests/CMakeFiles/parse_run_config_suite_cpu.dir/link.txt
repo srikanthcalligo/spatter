@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/parse_run_config_suite_cpu.dir/parse_run_config_suite_cpu.cc.o -o parse_run_config_suite_cpu  ../src/Spatter/libSpatter.a

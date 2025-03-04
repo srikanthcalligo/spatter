@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/parse_uniform_stride_1.dir/parse_uniform_stride_1.cc.o -o parse_uniform_stride_1  ../src/Spatter/libSpatter.a

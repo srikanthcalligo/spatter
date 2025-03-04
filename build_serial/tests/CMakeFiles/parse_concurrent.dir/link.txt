@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/parse_concurrent.dir/parse_concurrent.cc.o -o parse_concurrent  ../src/Spatter/libSpatter.a

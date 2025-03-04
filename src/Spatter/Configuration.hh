@@ -50,6 +50,23 @@ inline void gpuAssert(
 template <typename T>
 using aligned_vector = std::vector<T, aligned_allocator<T, ALIGN>>;
 
+
+#ifdef USE_TT_METAL
+
+#include <tt-metalium/host_api.hpp>
+#include "tt-metalium/constants.hpp"
+#include "tt-metalium/util.hpp"
+#include "tt-metalium/device.hpp"
+#include "tt-metalium/work_split.hpp"
+#include "tt-metalium/bfloat16.hpp"
+#include "tt-metalium/test_tiles.hpp"
+#include "tt-metalium/command_queue.hpp"
+#include "tt-metalium/tilize_untilize.hpp"
+
+#include "MetaliumBackend.hh"
+#endif
+
+
 namespace Spatter {
 
 class ConfigurationBase {
@@ -69,7 +86,7 @@ public:
       const long int seed, const size_t wrap, const size_t count,
       const size_t shared_mem, const size_t local_work_size, const int nthreads,
       const unsigned long nruns, const bool aggregate, const bool atomic,
-      const unsigned long verbosity);
+      const unsigned long verbosity, size_t tt_compute_mode = 0);
 
   virtual ~ConfigurationBase();
 
@@ -124,7 +141,7 @@ public:
   const size_t delta;
   const size_t delta_gather;
   const size_t delta_scatter;
-
+  
   long int seed;
   const size_t wrap;
   const size_t count;
@@ -138,6 +155,8 @@ public:
   const bool aggregate;
   const bool atomic;
   const unsigned long verbosity;
+  //TT-Metalium : Status of Compute mode
+  size_t tt_compute_mode;
 
   Spatter::Timer timer;
   std::vector<double> time_seconds;
@@ -235,6 +254,61 @@ public:
   size_t *dev_pattern;
   size_t *dev_pattern_gather;
   size_t *dev_pattern_scatter;
+};
+#endif
+
+#ifdef USE_TT_METAL
+template <> class Configuration<Spatter::TT_Metalium> : public ConfigurationBase {
+public:
+  Configuration(const size_t id, const std::string name,
+      const std::string kernel, const aligned_vector<size_t> &pattern,
+      const aligned_vector<size_t> &pattern_gather,
+      const aligned_vector<size_t> &pattern_scatter,
+      aligned_vector<double> &sparse, double *&dev_sparse, size_t &sparse_size,
+      aligned_vector<double> &sparse_gather, double *&dev_sparse_gather,
+      size_t &sparse_gather_size, aligned_vector<double> &sparse_scatter,
+      double *&dev_sparse_scatter, size_t &sparse_scatter_size,
+      aligned_vector<double> &dense,
+      aligned_vector<aligned_vector<double>> &dense_perthread,
+      double *&dev_dense, size_t &dense_size, const size_t delta,
+      const size_t delta_gather, const size_t delta_scatter,
+      const long int seed, const size_t wrap, const size_t count,
+      const unsigned long nruns, const bool aggregate,
+      const unsigned long verbosity, size_t tt_compute_mode = 0, size_t tt_parallel_mode = 0);
+
+~Configuration();
+
+  int run(bool timed, unsigned long run_id);
+  void gather(bool timed, unsigned long run_id);
+  void scatter(bool timed, unsigned long run_id);
+  void scatter_gather(bool timed, unsigned long run_id);
+  void multi_gather(bool timed, unsigned long run_id);
+  void multi_scatter(bool timed, unsigned long run_id);
+  void setup();
+
+private:
+  double kernel_exec_time = 0.0;
+  CoreCoord core = {0,0};
+  CoreRangeSet core_set;
+  uint32_t device_id = 0; 
+  IDevice *device = CreateDevice(device_id);
+  CommandQueue& cq = device->command_queue();
+  Program program = CreateProgram();
+  uint32_t single_tile_size = 32 * 32; //TILE_WIDTH * TILE_HEIGHT
+  uint32_t num_tiles_per_cb = 1;
+  CBHandle cb_sparse;
+  CBHandle cb_dense;
+  CBHandle cb_pattern;
+  CBHandle cb_gather_pattern;
+  CBHandle cb_scatter_pattern;
+  KernelHandle data_read_kernel_handle;
+  KernelHandle data_write_kernel_handle;
+  KernelHandle compute_kernel_handle;
+
+  size_t is_compute_mode_on; //TT-Metalium : To run on the compute core
+  uint32_t is_parallel_mode_on; //TT-Metalium : To run in parallel mode
+  uint32_t is_first_run = 0;
+
 };
 #endif
 

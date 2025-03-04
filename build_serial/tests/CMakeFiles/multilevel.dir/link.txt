@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/multilevel.dir/multilevel.cc.o -o multilevel  ../src/Spatter/libSpatter.a

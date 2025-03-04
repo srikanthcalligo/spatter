@@ -26,7 +26,7 @@
 
 namespace Spatter {
 static char *shortargs =
-    (char *)"ab:cd:e:f:g:hj:k:l:m:n:o:p:r:s::t:u:v:w:x:y:z:";
+    (char *)"ab:cd:e:f:g:hj:k:l:m:n:o:p:r:s::t:u:v:w:x:y:z:q:i:";
 const option longargs[] = {{"aggregate", no_argument, nullptr, 'a'},
     {"atomic-writes", required_argument, nullptr, 0},
     {"backend", required_argument, nullptr, 'b'},
@@ -51,7 +51,9 @@ const option longargs[] = {{"aggregate", no_argument, nullptr, 'a'},
     {"wrap", required_argument, nullptr, 'w'},
     {"delta-gather", required_argument, nullptr, 'x'},
     {"delta-scatter", required_argument, nullptr, 'y'},
-    {"local-work-size", required_argument, nullptr, 'z'}};
+    {"local-work-size", required_argument, nullptr, 'z'},
+    {"tt-compute-mode", required_argument, nullptr, 'q'},
+    {"tt-parallel-mode", required_argument, nullptr, 'i'}};
 
 struct ClArgs {
   std::vector<std::unique_ptr<Spatter::ConfigurationBase>> configs;
@@ -78,6 +80,9 @@ struct ClArgs {
   bool atomic;
   bool compress;
   unsigned long verbosity;
+  //TT-Metalium : Added following two flags
+  size_t tt_compute_mode;
+  size_t tt_parallel_mode;
 
   void report_header() {
 #ifdef USE_MPI
@@ -185,8 +190,11 @@ void help(char *progname) {
   std::cout << std::left << std::setw(10) << "-y (--delta-scatter)"
             << std::setw(40) << "Delta (default 8)" << std::left << "\n";
   std::cout << std::left << std::setw(10) << "-z (--local-work-size)"
-            << std::setw(40) << "Set Local Work Size (default 1024)"
-            << std::left << "\n";
+            << std::setw(40) << "Set Local Work Size (default 1024)" << std::left << "\n";
+  std::cout << std::left << std::setw(10) << "-q (--tt-compute-mode)"
+            << std::setw(40) << "Set 1 to run on TT-Metalium Compute Core" << std::left << "\n";
+  std::cout << std::left << std::setw(10) << "-i (--tt-parallel-mode)"
+            << std::setw(40) << "Set 1 to run TT-Metalium Parallel Version" << std::left << "\n";
 }
 
 void usage(char *progname) {
@@ -199,7 +207,7 @@ void usage(char *progname) {
                "shared-memory] [-n name] [-o op]"
                "[-p pattern] [-r runs] [-s random] [-t nthreads] [-u inner "
                "scatter pattern] [-v "
-               "verbosity] [-w wrap] [-z local-work-size]"
+               "verbosity] [-w wrap] [-z local-work-size] [-q tt-compute-mode] [-i tt-parallel-mode]"
             << std::endl;
 }
 
@@ -300,6 +308,10 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
 
   unsigned long verbosity = cl.verbosity;
   size_t wrap = 1;
+  //TT-Metalium : Added following two flags
+  size_t tt_compute_mode = 0;
+  size_t tt_parallel_mode = 0;
+
   size_t delta_gather = 8;
   size_t delta_scatter = 8;
   size_t local_work_size = 1024;
@@ -332,8 +344,9 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
           [](unsigned char c) { return std::tolower(c); });
 
       if ((backend.compare("serial") != 0) &&
-          (backend.compare("openmp") != 0) && (backend.compare("cuda") != 0)) {
-        std::cerr << "Valid Backends are: serial, openmp, cuda" << std::endl;
+          (backend.compare("openmp") != 0) && (backend.compare("cuda") != 0) &&
+          (backend.compare("tt-metal") != 0)) {
+        std::cerr << "Valid Backends are: serial, openmp, cuda, tt-metal" << std::endl;
         return -1;
       }
       if (backend.compare("openmp") == 0) {
@@ -348,7 +361,12 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
         return -1;
 #endif
       }
-      break;
+      if (backend.compare("tt-metal") == 0) {
+#ifndef USE_TT_METAL
+        std::cerr << "FAIL - TT-METAL Backend is not Enabled" << std::endl;
+        return -1;
+#endif
+      }
 
     case 'c':
       compress = true;
@@ -486,7 +504,14 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
               optarg, local_work_size, "Parsing Error: Local Work Size") == -1)
         return -1;
       break;
-
+    case 'q':
+      if (read_ul_arg(optarg, tt_compute_mode, "Parsing Error: Invalid tt_compute_mode") == -1)
+        return -1;
+      break;
+    case 'i':
+      if (read_ul_arg(optarg, tt_parallel_mode, "Parsing Error: Invalid tt_parallel_mode") == -1)
+        return -1;
+      break;
     case '?':
       usage(argv[0]);
       return -1;
@@ -503,12 +528,18 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
 #ifdef USE_CUDA
       backend = "cuda";
 #endif
+#ifdef USE_TT_METAL
+      backend = "tt-metal";
+#endif
   }
 
   cl.backend = backend;
   cl.aggregate = aggregate;
   cl.compress = compress;
   cl.verbosity = verbosity;
+  //TT-Metalium : Added following two flags
+  cl.tt_compute_mode = tt_compute_mode;
+  cl.tt_parallel_mode = tt_parallel_mode;
 
 #ifdef USE_OPENMP
   int max_threads = omp_get_max_threads();
@@ -620,6 +651,16 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
           cl.dev_sparse_scatter, cl.sparse_scatter_size, cl.dense,
           cl.dense_perthread, cl.dev_dense, cl.dense_size, delta, delta_gather,
           delta_scatter, seed, wrap, count, nruns, aggregate, verbosity);
+#ifdef USE_TT_METAL
+    else if (backend.compare("tt-metal") == 0)
+      c = std::make_unique<Spatter::Configuration<Spatter::TT_Metalium>>(0,
+          config_name, kernel, pattern, pattern_gather, pattern_scatter,
+          cl.sparse, cl.dev_sparse, cl.sparse_size, cl.sparse_gather,
+          cl.dev_sparse_gather, cl.sparse_gather_size, cl.sparse_scatter,
+          cl.dev_sparse_scatter, cl.sparse_scatter_size, cl.dense,
+          cl.dense_perthread, cl.dev_dense, cl.dense_size, delta, delta_gather,
+          delta_scatter, seed, wrap, count, nruns, aggregate, verbosity, cl.tt_compute_mode, cl.tt_parallel_mode);
+#endif
 #ifdef USE_OPENMP
     else if (backend.compare("openmp") == 0)
       c = std::make_unique<Spatter::Configuration<Spatter::OpenMP>>(0,
@@ -649,12 +690,21 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
 
     cl.configs.push_back(std::move(c));
   } else {
+#ifdef USE_TT_METAL
+    Spatter::JSONParser json_file = Spatter::JSONParser(json_fname, cl.sparse,
+        cl.dev_sparse, cl.sparse_size, cl.sparse_gather, cl.dev_sparse_gather,
+        cl.sparse_gather_size, cl.sparse_scatter, cl.dev_sparse_scatter,
+        cl.sparse_scatter_size, cl.dense, cl.dense_perthread, cl.dev_dense,
+        cl.dense_size, backend, aggregate, atomic, compress, shared_mem,
+        nthreads, verbosity, cl.tt_compute_mode, cl.tt_parallel_mode);
+#else
     Spatter::JSONParser json_file = Spatter::JSONParser(json_fname, cl.sparse,
         cl.dev_sparse, cl.sparse_size, cl.sparse_gather, cl.dev_sparse_gather,
         cl.sparse_gather_size, cl.sparse_scatter, cl.dev_sparse_scatter,
         cl.sparse_scatter_size, cl.dense, cl.dense_perthread, cl.dev_dense,
         cl.dense_size, backend, aggregate, atomic, compress, shared_mem,
         nthreads, verbosity);
+#endif
 
     for (size_t i = 0; i < json_file.size(); ++i) {
       std::unique_ptr<Spatter::ConfigurationBase> c = json_file[i];

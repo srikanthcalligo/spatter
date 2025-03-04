@@ -17,7 +17,7 @@ JSONParser::JSONParser(std::string filename, aligned_vector<double> &sparse,
     aligned_vector<aligned_vector<double>> &dense_perthread, double *&dev_dense,
     size_t &dense_size, const std::string backend, const bool aggregate,
     const bool atomic, const bool compress, size_t shared_mem,
-    const int nthreads, const unsigned long verbosity, const std::string name,
+    const int nthreads, const unsigned long verbosity, size_t tt_compute_mode, size_t tt_parallel_mode, const std::string name,
     const std::string kernel, const size_t pattern_size, const size_t delta,
     const size_t delta_gather, const size_t delta_scatter,
     const size_t boundary, const long int seed, const size_t wrap,
@@ -35,7 +35,7 @@ JSONParser::JSONParser(std::string filename, aligned_vector<double> &sparse,
       default_delta_(delta), default_delta_gather_(delta_gather),
       default_delta_scatter_(delta_scatter), default_boundary_(boundary),
       default_seed_(seed), default_wrap_(wrap), default_count_(count),
-      default_local_work_size_(local_work_size), default_nruns_(nruns) {
+      default_local_work_size_(local_work_size), default_nruns_(nruns), tt_compute_mode_(tt_compute_mode), tt_parallel_mode_(tt_parallel_mode) {
   if (!file_exists_(filename)) {
     std::cerr << "File does not exist" << std::endl;
     exit(1);
@@ -192,6 +192,17 @@ std::unique_ptr<Spatter::ConfigurationBase> JSONParser::operator[](
         dev_dense, dense_size, delta, delta_gather, delta_scatter,
         data_[index]["seed"], data_[index]["wrap"], data_[index]["count"],
         data_[index]["nruns"], aggregate_, verbosity_);
+#ifdef USE_TT_METAL
+  else if (backend_.compare("tt-metal") == 0)
+    c = std::make_unique<Spatter::Configuration<Spatter::TT_Metalium>>(index,
+        data_[index]["name"], data_[index]["kernel"], pattern, pattern_gather,
+        pattern_scatter, sparse, dev_sparse, sparse_size, sparse_gather,
+        dev_sparse_gather, sparse_gather_size, sparse_scatter,
+        dev_sparse_scatter, sparse_scatter_size, dense, dense_perthread,
+        dev_dense, dense_size, delta, delta_gather, delta_scatter,
+        data_[index]["seed"], data_[index]["wrap"], data_[index]["count"],
+        data_[index]["nruns"], aggregate_, verbosity_, tt_compute_mode_, tt_parallel_mode_);
+#endif
 #ifdef USE_OPENMP
   else if (backend_.compare("openmp") == 0)
     c = std::make_unique<Spatter::Configuration<Spatter::OpenMP>>(index,

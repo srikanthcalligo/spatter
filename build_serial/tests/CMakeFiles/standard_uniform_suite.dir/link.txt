@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/standard_uniform_suite.dir/standard_uniform_suite.cc.o -o standard_uniform_suite  ../src/Spatter/libSpatter.a

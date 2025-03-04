@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG "CMakeFiles/gz_read.dir/standard-suite/binary-traces/gz_read.cc.o" -o gz_read  -lz
