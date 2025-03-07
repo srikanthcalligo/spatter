@@ -18,6 +18,11 @@ void kernel_main()
     uint32_t wrap =  get_arg_val<uint32_t>(7);
     uint32_t single_tile_size = get_arg_val<uint32_t>(8);
     uint32_t extra_tile = get_arg_val<uint32_t>(9);
+    uint32_t stride = get_arg_val<uint32_t>(10);
+    uint32_t num_tiles_written = get_arg_val<uint32_t>(11);
+    uint32_t num_output_tiles_per_core = get_arg_val<uint32_t>(12);
+    uint32_t core_id = get_arg_val<uint32_t>(13);
+
     
     constexpr uint32_t cb_id0 = tt::CBIndex::c_0;
     constexpr uint32_t cb_id1 = tt::CBIndex::c_1;
@@ -54,7 +59,11 @@ void kernel_main()
 
     uint32_t outer_loop_count = single_tile_size / delta;
 
-    for(uint32_t tile_id = 0; tile_id < n_tiles; tile_id++) {
+    if(extra_tile){
+        outer_loop_count = outer_loop_count - stride;
+    }
+
+    for(uint32_t tile_id = num_tiles_written; tile_id < (num_tiles_written+num_output_tiles_per_core); tile_id++) {
         noc_async_read_tile(tile_id, sparse_buf, l1_write_addr_out0); // read the tile into the circular buffer
         noc_async_read_barrier();
         uint32_t* sparse_data = (uint32_t*) l1_write_addr_out0;

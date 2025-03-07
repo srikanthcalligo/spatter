@@ -62,7 +62,6 @@ void kernel_main()
                 uint32_t index_0 = (j + pattern_length * (i % wrap));
                 uint32_t index_1 = (*(data_pattern+j) + delta * i);
                 *(data_sparse+index_1) = *(data_dense+index_0);
-                //DPRINT << "IN0 = "<< index_0 << " IN1= " << index_1 << "  "<< *(data_sparse+index_0) << ENDL();
             }
         }
         // Write data from L1 circulr buffer (out0) -> DRAM

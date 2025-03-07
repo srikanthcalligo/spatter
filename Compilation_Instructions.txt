@@ -57,6 +57,16 @@ Step 3 : Run the Spatter Test
 
                     -i : tt-parallel-mode (0: To run on Single core, 1: To run on Multicore). 
 
+
+Step 4 : To Run JSON test cases use Run_JSON_Tests.sh script file.
+
+		copy Run_JSON_Tests.sh to /home/user/tt-metal/ or go to spatter main directory
+		Change file permission : "chmod +x Run_JSON_Tests.sh"
+		 
+		Command : ./Run_JSON_Tests.sh json_input_file.json compute_mode parallel_mode verbose
+				Ex: ./Run_TT_Json_Test.sh tt_metal/programming_examples/spatter/standard-suite/basic-tests/cpu-stream.json 0 0 2
+					(The above command will run riscv version and use single core) 
+
 Kernels Porting Status:
 ***********************
 

@@ -3,7 +3,7 @@
 
 void kernel_main()
 {
-    //export TT_METAL_DPRINT_CORES=0,0
+    //export TT_METAL_DPRINT_CORES="(0,0)-(7,7)"
     //Copy data from DRAM to Core0,0 L1
     uint32_t dram_addr_sparse = get_arg_val<uint32_t>(0);
     uint32_t dram_addr_pattern = get_arg_val<uint32_t>(1);
@@ -66,7 +66,7 @@ void kernel_main()
     }
     
     //Each thread will iterate through all tiles which have been assigned to it.
-    for(uint32_t tile_id = core_id*num_output_tiles_per_core; tile_id < (core_id*num_output_tiles_per_core+num_output_tiles_per_core); tile_id++) {
+    for(uint32_t tile_id = num_tiles_written; tile_id < (num_tiles_written+num_output_tiles_per_core); tile_id++) {
         noc_async_read_tile(tile_id, src_a_buf, l1_write_addr_in0); // read the tile into the circular buffer
         noc_async_read_barrier();
         uint32_t* data_sparse = (uint32_t*) l1_write_addr_in0;

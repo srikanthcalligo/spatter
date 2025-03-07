@@ -171,6 +171,15 @@ template double metalium_scatter_gather_wrapper<uint32_t>(const aligned_vector<s
     CommandQueue& cq, Program &program, uint32_t single_tile_size, 
     KernelHandle data_read_kernel_handle, KernelHandle data_write_kernel_handle, KernelHandle compute_kernel_handle);
 
+template double metalium_scatter_gather_wrapper<bfloat16>(const aligned_vector<size_t> &pattern_scatter,
+    aligned_vector<double> &sparse_scatter, const aligned_vector<size_t> &pattern_gather,
+    const aligned_vector<double> &sparse_gather, const size_t pattern_length,
+    const size_t delta_scatter, const size_t delta_gather, const size_t wrap,
+    const size_t count, bool is_compute_mode_on,uint32_t is_parallel_mode_on,
+    CoreCoord core, uint32_t device_id, IDevice *device,
+    CommandQueue& cq, Program &program, uint32_t single_tile_size, 
+    KernelHandle data_read_kernel_handle, KernelHandle data_write_kernel_handle, KernelHandle compute_kernel_handle);
+
 //multi_gather
 template double metalium_multi_gather_wrapper<uint32_t>(const aligned_vector<size_t> &pattern,
     const aligned_vector<size_t> &pattern_gather, const aligned_vector<double> &sparse, aligned_vector<double> &dense,
@@ -213,7 +222,7 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
     uint32_t remainder = single_tile_size % pattern_length;
     uint32_t iin = 0, icn = 1;
     uint32_t extra_tile = sparse.size() % single_tile_size;
-    
+    uint32_t no_cores = 1;
     if constexpr (std::is_integral_v<T>){
       //Sparse array 
       for(int i=0 ; i < sparse.size(); i++){
@@ -230,6 +239,10 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
     }
     else if constexpr (std::is_same_v<T, bfloat16>) {
       for(uint32_t i=0; i < sparse.size() ; i++){
+        if((extra_tile != 0) && (i > 0) && (i % (icn * single_tile_size - remainder) == 0)){
+          iin = remainder + (delta - remainder);
+          icn = icn + 1;
+        }
         dev_sparse[i] = bfloat16(static_cast<float>(sparse[i]));
       }
       float in_val = 0;
@@ -258,8 +271,9 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
         uint32_t num_cores_y = compute_with_storage_grid_size.y;
         auto [num_cores, all_cores, core_group_1, core_group_2, num_output_tiles_per_core_group_1, num_output_tiles_per_core_group_2] = split_work_to_cores(compute_with_storage_grid_size, n_tiles);
 #ifdef PRINT_DEBUG
-        std::cout << "No.of Cores : " << n_tiles << std::endl;
+        std::cout << "No.of Cores : " << num_cores << std::endl;
 #endif        
+        no_cores = num_cores;
         //Output buffer creation
         dram_buffer_dense = MakeBuffer(device, single_tile_size * num_cores, single_tile_size, sizeof(T));
         for (uint32_t i = 0, num_tiles_written = 0; i < num_cores; i++){
@@ -302,8 +316,9 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
         uint32_t num_cores_y = compute_with_storage_grid_size.y;
         auto [num_cores, all_cores, core_group_1, core_group_2, num_output_tiles_per_core_group_1, num_output_tiles_per_core_group_2] = split_work_to_cores(compute_with_storage_grid_size, n_tiles);
 #ifdef PRINT_DEBUG
-        std::cout << "No.of Cores : " << n_tiles << std::endl;
+        std::cout << "No.of Cores : " << num_cores << std::endl;
 #endif        
+        no_cores = num_cores;
         //Output buffer creation
         dram_buffer_dense = MakeBuffer(device, single_tile_size * num_cores, single_tile_size, sizeof(T));
         //Create a parallel region
@@ -359,18 +374,12 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
 #ifdef PRINT_DEBUG
     printf("TT Result : \n");
     if constexpr (std::is_same_v<T, bfloat16>) {
-      if(is_compute_mode_on){
-        for(uint32_t i= dev_dense.size() - (pattern_length * stride); i < dev_dense.size(); i = i+stride){
+        for(uint32_t i= 0; i < pattern_length; i = i + stride){
           printf("%f ", dev_dense[i].to_float());
         }
-      } else {
-        for(uint32_t i= single_tile_size - pattern_length; i < single_tile_size; i = i+stride){
-          printf("%f ", dev_dense[i].to_float());
-        }
-      }
     }else if constexpr (std::is_integral_v<T>) {
-      if(is_compute_mode_on){
-        for(uint32_t i= dev_dense.size() - (pattern_length * stride); i < dev_dense.size(); i = i+stride){
+      if(is_parallel_mode_on){
+        for(uint32_t i= (no_cores -1) * single_tile_size; i < (no_cores - 1) * single_tile_size  +  pattern_length; i++){
           printf("%u ", dev_dense[i]);
         }
       } else {
@@ -593,37 +602,84 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
 #endif
     
     //Input arrarys
-    std::vector<uint32_t> pattern_scatter_dram(pattern_length);
-    std::vector<uint32_t> pattern_gather_dram(pattern_length);
-    std::vector<uint32_t> sparse_gather_dram(single_tile_size * n_tiles);
-    std::vector<uint32_t> sparse_scatter_dram(single_tile_size * n_tiles);
+    std::vector<T> pattern_scatter_dram(single_tile_size);
+    std::vector<T> pattern_gather_dram(single_tile_size);
+    std::vector<T> sparse_gather_dram(single_tile_size * n_tiles);
+    std::vector<T> sparse_scatter_dram(single_tile_size * n_tiles);
 
-    for(int i=0 ; i < sparse_gather.size(); i++){
-      sparse_gather_dram[i] = sparse_gather[i];
-    }
-    for(int i=0 ; i < pattern_length ; i++){
-      pattern_scatter_dram[i] = pattern_scatter[i];
-      pattern_gather_dram[i] = pattern_gather[i];
+    if constexpr (std::is_same_v<T, bfloat16>) {
+      for(int i=0 ; i < sparse_gather.size(); i++){
+        sparse_gather_dram[i] = bfloat16(static_cast<float>(sparse_gather[i]));
+      }
+      for(int i=0 ; i < single_tile_size ; i++){
+        pattern_scatter_dram[i] = bfloat16(static_cast<float>(0));
+        pattern_gather_dram[i] = bfloat16(static_cast<float>(0));
+      }
+    }else if constexpr (std::is_integral_v<T>){
+
+      for(int i=0 ; i < sparse_gather.size(); i++){
+        sparse_gather_dram[i] = sparse_gather[i];
+      }
+      for(int i=0 ; i < pattern_length ; i++){
+        pattern_scatter_dram[i] = pattern_scatter[i];
+        pattern_gather_dram[i] = pattern_gather[i];
+      }
     }
     
     std::shared_ptr<tt::tt_metal::Buffer> pattern_scatter_dram_buffer = MakeBuffer(device, single_tile_size, single_tile_size, sizeof(T));
     std::shared_ptr<tt::tt_metal::Buffer> pattern_gather_dram_buffer = MakeBuffer(device, single_tile_size, single_tile_size, sizeof(T));
     std::shared_ptr<tt::tt_metal::Buffer> sparse_scatter_dram_buffer = MakeBuffer(device, single_tile_size * n_tiles, single_tile_size, sizeof(T));
-    std::shared_ptr<tt::tt_metal::Buffer> sparse_gather_dram_buffer = MakeBuffer(device, single_tile_size * n_tiles, single_tile_size, sizeof(T));;
+    std::shared_ptr<tt::tt_metal::Buffer> sparse_gather_dram_buffer = MakeBuffer(device, single_tile_size * n_tiles, single_tile_size, sizeof(T));
 
     EnqueueWriteBuffer(cq, pattern_gather_dram_buffer, pattern_gather_dram, false);
     EnqueueWriteBuffer(cq, pattern_scatter_dram_buffer, pattern_scatter_dram, false);
     EnqueueWriteBuffer(cq, sparse_gather_dram_buffer, sparse_gather_dram, false);
 
-    SetRuntimeArgs(
-      program,
-      data_read_kernel_handle,
-      core, {pattern_gather_dram_buffer->address(),
-             pattern_scatter_dram_buffer->address(),
-             sparse_gather_dram_buffer->address(),
-             sparse_scatter_dram_buffer->address(),
-             n_tiles,pattern_length, delta_gather, delta_scatter, count, single_tile_size, remainder});
+    if constexpr (std::is_integral_v<T>){
+      if(is_parallel_mode_on){
+        auto compute_with_storage_grid_size = device->compute_with_storage_grid_size();
+        uint32_t num_cores_x = compute_with_storage_grid_size.x;
+        uint32_t num_cores_y = compute_with_storage_grid_size.y;
+        auto [num_cores, all_cores, core_group_1, core_group_2, num_output_tiles_per_core_group_1, num_output_tiles_per_core_group_2] = split_work_to_cores(compute_with_storage_grid_size, n_tiles);
+        for (uint32_t i = 0, num_tiles_written = 0; i < num_cores; i++){
+ 
+          CoreCoord core = {i / num_cores_y, i % num_cores_y};
 
+          uint32_t num_output_tiles_per_core = 0;
+          if (core_group_1.contains(core)) {
+          num_output_tiles_per_core = num_output_tiles_per_core_group_1;
+          } else if (core_group_2.contains(core)) {
+              num_output_tiles_per_core = num_output_tiles_per_core_group_2;
+          } else {
+              TT_ASSERT(false, "Core not in specified core ranges");
+          }
+          SetRuntimeArgs(program,
+          data_read_kernel_handle,
+          core,
+          {pattern_gather_dram_buffer->address(),
+            pattern_scatter_dram_buffer->address(),
+            sparse_gather_dram_buffer->address(),
+            sparse_scatter_dram_buffer->address(),
+            n_tiles,pattern_length, delta_gather, delta_scatter, count, single_tile_size, remainder,
+            num_tiles_written, num_output_tiles_per_core, i
+          });
+          num_tiles_written += num_output_tiles_per_core;
+        }
+      } else {
+        SetRuntimeArgs(
+          program,
+          data_read_kernel_handle,
+          core, {pattern_gather_dram_buffer->address(),
+                pattern_scatter_dram_buffer->address(),
+                sparse_gather_dram_buffer->address(),
+                sparse_scatter_dram_buffer->address(),
+                n_tiles,pattern_length, delta_gather, delta_scatter, count, single_tile_size, remainder});
+      }
+    } else if constexpr (std::is_same_v<T, bfloat16>){
+        SetRuntimeArgs(program, data_read_kernel_handle, core, {pattern_gather_dram_buffer->address(), pattern_scatter_dram_buffer->address(), sparse_gather_dram_buffer->address(), n_tiles});
+        SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles});
+        SetRuntimeArgs(program, data_write_kernel_handle, core, {sparse_scatter_dram_buffer->address(), n_tiles});
+    }
     //Start the timer
     auto start_time = std::chrono::high_resolution_clock::now();
     
@@ -637,7 +693,7 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
     EnqueueReadBuffer(cq, sparse_scatter_dram_buffer, sparse_scatter_dram, true);
 
 #ifdef PRINT_DEBUG
-    //printf("Destination array size = %zu\n", sparse_scatter_dram.size());
+    printf("Destination array size = %zu %zu %zu %zu %zu\n", sparse_scatter.size(), sparse_gather.size(), pattern_scatter[0], pattern_gather[0], pattern_length);
     printf("Results : \n");
     //Host Run
     for (size_t i = 0; i < count; ++i){
@@ -646,9 +702,14 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
           sparse_gather[pattern_gather[j] + delta_gather * i];    
       }
     }
-
-    for(int i= (n_tiles-1) * single_tile_size + 1; i < (n_tiles -1) * single_tile_size + 5 * delta_scatter; i = i + delta_scatter){
-      printf("TT : %u  Expected : %f\n", sparse_scatter_dram[i], sparse_scatter[i]);
+    if constexpr (std::is_same_v<T, bfloat16>) {
+      for(int i= (n_tiles-1) * single_tile_size + pattern_scatter[0]; i < (n_tiles -1) * single_tile_size + 5 * delta_scatter; i = i + delta_scatter){
+        printf("TT : %f  Expected : %f\n", sparse_scatter_dram[i].to_float(), sparse_scatter[i]);
+      }
+    } else if constexpr (std::is_integral_v<T>) {
+      for(int i= (n_tiles-1) * single_tile_size + pattern_scatter[0]; i < (n_tiles -1) * single_tile_size + 5 * delta_scatter; i = i + delta_scatter){
+        printf("TT : %u  Expected : %f\n", sparse_scatter_dram[i], sparse_scatter[i]);
+      }
     }
 #endif
 
@@ -670,7 +731,9 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
 
     uint32_t n_tiles = (sparse.size()) / single_tile_size;
     uint32_t remainder = sparse.size() % single_tile_size;
+    uint32_t stride = pattern_gather[pattern_length - 1];
     n_tiles = (sparse.size() % single_tile_size == 0 ) ? n_tiles : n_tiles + 1;
+    uint32_t no_cores  = 1;
 
 #ifdef PRINT_DEBUG
     std::cout << "No.of Tiles : " << n_tiles << std::endl;
@@ -679,16 +742,23 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
     std::shared_ptr<tt::tt_metal::Buffer> pattern_dram_buffer = MakeBuffer(device, single_tile_size, single_tile_size, sizeof(T));
     std::shared_ptr<tt::tt_metal::Buffer> pattern_gather_dram_buffer = MakeBuffer(device, single_tile_size, single_tile_size, sizeof(T));
     std::shared_ptr<tt::tt_metal::Buffer> sparse_dram_buffer = MakeBuffer(device, single_tile_size * n_tiles, single_tile_size, sizeof(T));
-    std::shared_ptr<tt::tt_metal::Buffer> dense_dram_buffer = MakeBuffer(device, single_tile_size, single_tile_size, sizeof(T));
+    std::shared_ptr<tt::tt_metal::Buffer> dense_dram_buffer;
 
-    //uint32_t pattern and sparse arrary
+    //Input pattern and sparse arrary
     std::vector<T> pattern_dram(pattern.size());
     std::vector<T> pattern_gather_dram(pattern_gather.size());
-    std::vector<T> sparse_dram(sparse.size());
+    std::vector<T> sparse_dram(n_tiles * single_tile_size);
     std::vector<T> dense_dram(dense.size());
 
+    uint32_t iin = 0, icn = 1;
+    uint32_t tile_remainder = single_tile_size % delta;
+
     for(int i=0 ; i < sparse.size(); i++){
-      sparse_dram[i] = sparse[i];
+        if((remainder != 0) && (i > 0) && (i % (icn * single_tile_size - tile_remainder) == 0)){
+          iin = tile_remainder + (delta - tile_remainder);
+          icn = icn + 1;
+        }
+        sparse_dram[i + iin] = sparse[i];
     }
     for(int i=0 ; i < pattern.size() ; i++){
       pattern_dram[i] = pattern[i];
@@ -701,16 +771,58 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
     EnqueueWriteBuffer(cq, pattern_dram_buffer, pattern_dram, false);
     EnqueueWriteBuffer(cq, pattern_gather_dram_buffer, pattern_gather_dram, false);
     EnqueueWriteBuffer(cq, sparse_dram_buffer, sparse_dram, false);
+    if(is_parallel_mode_on){
+        auto compute_with_storage_grid_size = device->compute_with_storage_grid_size();
+        uint32_t num_cores_x = compute_with_storage_grid_size.x;
+        uint32_t num_cores_y = compute_with_storage_grid_size.y;
+        auto [num_cores, all_cores, core_group_1, core_group_2, num_output_tiles_per_core_group_1, num_output_tiles_per_core_group_2] = split_work_to_cores(compute_with_storage_grid_size, n_tiles);
+        no_cores = num_cores;
+        //std::cout << num_output_tiles_per_core_group_1 << std::endl;
+        //std::cout << num_output_tiles_per_core_group_2 << std::endl;
 
-    SetRuntimeArgs(
-      program,
-      data_read_kernel_handle,
-      core, {pattern_gather_dram_buffer->address(),
-             pattern_dram_buffer->address(),
-             sparse_dram_buffer->address(),
-             dense_dram_buffer->address(),
-             n_tiles,pattern_length, delta, wrap, pattern.size(), single_tile_size});
+#ifdef PRINT_DEBUG
+        std::cout << "No.of Cores : " << n_tiles << std::endl;
+#endif        
+        //Output buffer creation
+        dense_dram_buffer = MakeBuffer(device, single_tile_size * num_cores, single_tile_size, sizeof(T));
+        //Create a parallel region
+        for (uint32_t i = 0, num_tiles_written = 0; i < num_cores; i++){
+            CoreCoord core_id = {i / num_cores_y, i % num_cores_y};
 
+            uint32_t num_output_tiles_per_core = 0;
+            if (core_group_1.contains(core_id)) {
+            num_output_tiles_per_core = num_output_tiles_per_core_group_1;
+            } else if (core_group_2.contains(core_id)) {
+                num_output_tiles_per_core = num_output_tiles_per_core_group_2;
+            } else {
+                TT_ASSERT(false, "Core not in specified core ranges");
+            }
+            SetRuntimeArgs(program,
+              data_read_kernel_handle,
+              core_id,
+              {pattern_gather_dram_buffer->address(),
+              pattern_dram_buffer->address(),
+              sparse_dram_buffer->address(),
+              dense_dram_buffer->address(),
+              n_tiles,pattern_length, delta, wrap, single_tile_size, remainder, stride,
+              num_tiles_written,
+              num_output_tiles_per_core, 
+              i, count,
+              });
+            num_tiles_written += num_output_tiles_per_core;
+        }
+
+      }else{
+        dense_dram_buffer = MakeBuffer(device, single_tile_size, single_tile_size, sizeof(T));
+        SetRuntimeArgs(
+          program,
+          data_read_kernel_handle,
+          core, {pattern_gather_dram_buffer->address(),
+                pattern_dram_buffer->address(),
+                sparse_dram_buffer->address(),
+                dense_dram_buffer->address(),
+                n_tiles,pattern_length, delta, wrap, remainder, single_tile_size, stride, count});
+      }
     //Start the timer
     auto start_time = std::chrono::high_resolution_clock::now();
     
@@ -724,6 +836,7 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
     EnqueueReadBuffer(cq, dense_dram_buffer, dense_dram, true);
 
 #ifdef PRINT_DEBUG
+    //printf("Destination array size = %zu %zu %zu %u %zu\n", sparse.size(), dense.size(), pattern_length, stride, count);
 
     printf("Results : \n");
     //Host run
@@ -733,12 +846,18 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
       dense[j + pattern_length * (i % wrap)] =
           sparse[pattern[pattern_gather[j]] + delta * i];
       if(i == (count - 1)){
-        printf("Expected : %f \n", dense[j + pattern_length * (i % wrap)]);
+        printf("Expected : %f\n", dense[j + pattern_length * (i % wrap)]);
       }
     }
-
-    for(int i=0 ; i < pattern_length ; i++){
-      printf("TT :%u ", dense_dram[i]);
+    if(is_parallel_mode_on) {
+      for(int i= 0 ; i < no_cores ; i++){
+        printf("TT :%u ", dense_dram[i * single_tile_size]);
+      }
+    }
+    else {
+      for(int i=0 ; i < pattern_length ; i++){
+        printf("TT :%u ", dense_dram[i]);
+      }
     }
     printf("\n\n");
 #endif
@@ -765,10 +884,11 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
     
     n_tiles = (sparse.size() % single_tile_size == 0 ) ? n_tiles : n_tiles + 1;
     
+    uint32_t stride = pattern_scatter[pattern_length - 1];
+
 #ifdef PRINT_DEBUG
     printf("No.of Tiles = %u\n", n_tiles);
 #endif
-    
     std::shared_ptr<tt::tt_metal::Buffer> pattern_dram_buffer = MakeBuffer(device, single_tile_size, single_tile_size, sizeof(T));
     std::shared_ptr<tt::tt_metal::Buffer> pattern_scatter_dram_buffer = MakeBuffer(device, single_tile_size, single_tile_size, sizeof(T));
     std::shared_ptr<tt::tt_metal::Buffer> sparse_dram_buffer = MakeBuffer(device, single_tile_size * n_tiles, single_tile_size, sizeof(T));
@@ -793,16 +913,49 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
     EnqueueWriteBuffer(cq, pattern_dram_buffer, pattern_dram, false);
     EnqueueWriteBuffer(cq, pattern_scatter_dram_buffer, pattern_scatter_dram, false);
     EnqueueWriteBuffer(cq, dense_dram_buffer, dense_dram, false);
+    if(is_parallel_mode_on){
+        
+        auto compute_with_storage_grid_size = device->compute_with_storage_grid_size();
+        uint32_t num_cores_x = compute_with_storage_grid_size.x;
+        uint32_t num_cores_y = compute_with_storage_grid_size.y;
+        auto [num_cores, all_cores, core_group_1, core_group_2, num_output_tiles_per_core_group_1, num_output_tiles_per_core_group_2] = split_work_to_cores(compute_with_storage_grid_size, n_tiles);
+        
+        for (uint32_t i = 0, num_tiles_written = 0; i < num_cores; i++){
+ 
+          CoreCoord core = {i / num_cores_y, i % num_cores_y};
 
-    SetRuntimeArgs(
-      program,
-      data_read_kernel_handle,
-      core, {pattern_scatter_dram_buffer->address(),
-             pattern_dram_buffer->address(),
-             sparse_dram_buffer->address(),
-             dense_dram_buffer->address(),
-             n_tiles,pattern_length, delta, wrap, pattern.size(), single_tile_size, remainder});
-
+          uint32_t num_output_tiles_per_core = 0;
+          if (core_group_1.contains(core)) {
+          num_output_tiles_per_core = num_output_tiles_per_core_group_1;
+          } else if (core_group_2.contains(core)) {
+              num_output_tiles_per_core = num_output_tiles_per_core_group_2;
+          } else {
+              TT_ASSERT(false, "Core not in specified core ranges");
+          }
+          SetRuntimeArgs(program,
+          data_read_kernel_handle,
+          core,
+          {pattern_scatter_dram_buffer->address(),
+          pattern_dram_buffer->address(),
+          sparse_dram_buffer->address(),
+          dense_dram_buffer->address(),
+          n_tiles,pattern_length, delta, wrap, single_tile_size, remainder,stride,
+          num_tiles_written,
+          num_output_tiles_per_core, 
+          i
+          });
+          num_tiles_written += num_output_tiles_per_core;
+        }
+      } else {
+          SetRuntimeArgs(
+            program,
+            data_read_kernel_handle,
+            core, {pattern_scatter_dram_buffer->address(),
+                  pattern_dram_buffer->address(),
+                  sparse_dram_buffer->address(),
+                  dense_dram_buffer->address(),
+                  n_tiles,pattern_length, delta, wrap, single_tile_size, remainder});
+      }
     //Start the timer
     auto start_time = std::chrono::high_resolution_clock::now();
     
@@ -824,7 +977,7 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
       for (size_t j = 0; j < pattern_length; ++j){
         sparse[pattern[pattern_scatter[j]] + delta * i] =
             dense[j + pattern_length * (i % wrap)];      
-        if(i == count -1){
+        if(i > count - 1){
           printf("Expected : %f\n", sparse[pattern[pattern_scatter[j]] + delta * i]);
         }
       }

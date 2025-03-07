@@ -65,7 +65,7 @@ void kernel_main()
         outer_loop_count = outer_loop_count - stride;
     }
     
-    for(uint32_t tile_id = core_id*num_output_tiles_per_core; tile_id < (core_id*num_output_tiles_per_core+num_output_tiles_per_core); tile_id++) {
+    for(uint32_t tile_id = num_tiles_written; tile_id < (num_tiles_written+num_output_tiles_per_core); tile_id++) {
         noc_async_read_tile(tile_id, src_a_buf, l1_write_addr_out0); // read the tile into the circular buffer
         noc_async_read_barrier();
         uint32_t* data_sparse = (uint32_t*) l1_write_addr_out0;
@@ -77,7 +77,6 @@ void kernel_main()
                 uint32_t index_0 = (j + pattern_length * (i % wrap));
                 uint32_t index_1 = (*(data_pattern+j) + delta * i);
                 *(data_sparse+index_1) = *(data_dense+index_0);
-                //DPRINT << "IN0 = "<< index_0 << " IN1= " << index_1 << "  "<< *(data_sparse+index_0) << ENDL();
             }
         }
         // Write data from L1 circulr buffer (out0) -> DRAM

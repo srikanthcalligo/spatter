@@ -18,7 +18,7 @@ void kernel_main(){
         .data_format = DataFormat::Float16_b,
     };
     
-    for(uint32_t tile_id = core_id*num_output_tiles_per_core; tile_id < (core_id*num_output_tiles_per_core+num_output_tiles_per_core); tile_id++) {
+    for(uint32_t tile_id = num_tiles_written; tile_id < (num_tiles_written+num_output_tiles_per_core); tile_id++) {
         cb_wait_front(cb_id_out0, 1);
         uint32_t cb_out0_addr = get_read_ptr(cb_id_out0);
         noc_async_write_tile(tile_id, dest, cb_out0_addr);

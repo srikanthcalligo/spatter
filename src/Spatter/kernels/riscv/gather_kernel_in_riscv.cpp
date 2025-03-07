@@ -68,7 +68,6 @@ void kernel_main()
 
         for(uint32_t i = 0; i < outer_loop_count; i++) {
             for(uint32_t j = 0; j < pattern_length; j++) {
-                //DPRINT << "VAL = " << *(dat0+i) << ENDL();
                 uint32_t index_0 = (j + pattern_length * (i % wrap));
                 uint32_t index_1 = (*(data_pattern+j) + delta * i);
                 *(data_dense+index_0) = *(data_sparse+index_1);

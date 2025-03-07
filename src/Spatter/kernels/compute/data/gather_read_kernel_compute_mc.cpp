@@ -36,7 +36,7 @@ void kernel_main()
         .data_format = DataFormat::Float16_b, // The data format of the buffer
     };
 
-    for(uint32_t tile_id = core_id*num_output_tiles_per_core; tile_id < (core_id*num_output_tiles_per_core+num_output_tiles_per_core); tile_id++) {
+    for(uint32_t tile_id = num_tiles_written; tile_id < (num_tiles_written+num_output_tiles_per_core); tile_id++) {
         cb_reserve_back(sparse_cb_id0, 1);
         cb_reserve_back(pattern_cb_id1, 1);
         

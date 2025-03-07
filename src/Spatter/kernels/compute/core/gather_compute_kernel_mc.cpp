@@ -29,8 +29,7 @@ void MAIN {
 
     //DPRINT << "Hello core =" << core_id << ENDL(); 
     
-    for(uint32_t tile_id = core_id*num_output_tiles_per_core; tile_id < (core_id*num_output_tiles_per_core+num_output_tiles_per_core); tile_id++)
-    {
+    for(uint32_t tile_id = num_tiles_written; tile_id < (num_tiles_written+num_output_tiles_per_core); tile_id++) {
         //DeviceZoneScopedN("TEST-FULL");
         cb_wait_front(cb_in0, 1);
         cb_wait_front(cb_in1, 1);
