@@ -299,8 +299,10 @@ private:
   CBHandle cb_sparse;
   CBHandle cb_dense;
   CBHandle cb_pattern;
-  CBHandle cb_gather_pattern;
-  CBHandle cb_scatter_pattern;
+  CBHandle cb_pattern_gather;
+  CBHandle cb_pattern_scatter;
+  CBHandle cb_sparse_gather;
+  CBHandle cb_sparse_scatter;
   KernelHandle data_read_kernel_handle;
   KernelHandle data_write_kernel_handle;
   KernelHandle compute_kernel_handle;
