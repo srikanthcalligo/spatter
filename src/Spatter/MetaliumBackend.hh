@@ -3,6 +3,10 @@
 
 #include <cstddef>
 
+using namespace tt::constants;
+using namespace tt;
+using namespace tt::tt_metal;
+
 //Metalium API related functions
 CBHandle MakeCircularBuffer_UInt32(CoreCoord core, CoreRangeSet core_set, uint32_t is_parallel_mode_on, Program &program, tt::CBIndex cb_index, uint32_t num_tiles_per_cb, uint32_t single_tile_size);
 CBHandle MakeCircularBuffer_BFloat16(CoreCoord core, CoreRangeSet core_set, uint32_t is_parallel_mode_on, Program &program, tt::CBIndex cb_index, uint32_t num_tiles_per_cb, uint32_t single_tile_size);

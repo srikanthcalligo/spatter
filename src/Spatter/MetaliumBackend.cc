@@ -3,10 +3,6 @@
 #include "Configuration.hh"
 #include <chrono>
 
-using namespace tt::constants;
-using namespace tt;
-using namespace tt::tt_metal;
-
 CBHandle MakeCircularBuffer_UInt32(CoreCoord core, CoreRangeSet core_set, uint32_t is_parallel_mode_on, Program &program, tt::CBIndex cb_index, uint32_t num_tiles_per_cb, uint32_t single_tile_size)
 {
   uint32_t buf_size = num_tiles_per_cb * single_tile_size * sizeof(uint32_t);

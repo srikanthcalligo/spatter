@@ -7,10 +7,6 @@
 
 #include "Configuration.hh"
 
-using namespace tt::constants;
-using namespace tt;
-using namespace tt::tt_metal;
-
 namespace Spatter {
 
 ConfigurationBase::ConfigurationBase(const size_t id, const std::string name,
