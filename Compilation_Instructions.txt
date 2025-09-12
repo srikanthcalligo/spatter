@@ -1,0 +1,83 @@
+Steps to compile and run the spatter application:
+*************************************************
+
+Step 0 : Update cmake version to 3.25 or above
+		
+        Clone the tt-metal branch. Currently, we are using (HEAD detached at v0.59.0-rc14) branch.
+        
+        $ cd /home/user/tt-metal
+
+step 1 : Change the directoy to 
+         
+        $ cd /home/user/tt-metal/tt_metal/programming_examples
+
+Step 2 : Clone and build the spatter repository
+
+		 $ git clone https://github.com/srikanthcalligo/spatter.git
+		
+		 Add below lines to /home/user/tt-metal/tt_metal/programming_examples/CMakeLists.txt file
+		 	
+		 	add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/spatter)
+
+			# Add only spatter to the below existing line 
+			add_custom_target(
+    			programming_examples
+    			DEPENDS
+        			profiler_examples
+        			contributed
+        			spatter
+        			${PROGRAMMING_EXAMPLES_TEST_TARGETS}
+			)
+		 
+		 $ cd /home/user/tt-metal
+		 
+		 Note : To Enable debug prints, refer spatter/cmake/pkgs/MetaliumSupport.cmake file. 
+		  
+		 $ ./build_metal.sh --enable-profiler --build-programming-examples
+
+                 Note : Binaries will be stored under /home/user/tt-metal/build/tt_metal/programming_examples/spatter directory.
+		 
+
+Step 3 : Run the Spatter Test
+
+        cd /home/user/tt-metal
+
+        ./build/tt_metal/programming_examples/spatter/spatter -p UNIFORM:8:1 -k gather -l $((2**24)) -b tt-metal -q 1 -i 1  
+
+                Flags Info: 
+
+                    -p : Pattern type:Pattern length:stride 
+
+                    -k : kernel type: Possible options are scatter, gather, sg, multigather and multiscatter. 
+
+                                Note : To run sg, multigather and multiscatter modes, we need to pass “-u 1 -g 1” flags additionally. 
+
+                    -l : No.of transfers. 
+
+                    -b : Backend : Options are serial, openmp, cuda and tt-metal. 
+
+                    -q : tt-compute-mode (0: To run on riscv core, 1: To run on compute core). 
+
+                    -i : tt-parallel-mode (0: To run on Single core, 1: To run on Multicore). 
+
+
+Step 4 : To Run JSON test cases use Run_JSON_Tests.sh script file.
+
+		copy Run_JSON_Tests.sh to /home/user/tt-metal/ or go to spatter main directory
+		Change the file permission : "chmod +x Run_JSON_Tests.sh"
+		 
+		Command : ./Run_JSON_Tests.sh json_input_file.json compute_mode parallel_mode verbose
+				Ex: ./Run_TT_Json_Test.sh tt_metal/programming_examples/spatter/standard-suite/basic-tests/cpu-stream.json 0 0 2
+					(The above command will run the application in riscv mode and use single core) 
+
+Kernels Porting Status:
+***********************
+
+KernelName       RISCV Version                Compute Version 
+
+              Serial    Multicore          Serial    Multicore 
+
+gather          YES       YES                YES       YES 
+
+ 
+
