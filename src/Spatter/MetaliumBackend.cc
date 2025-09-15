@@ -255,7 +255,9 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
     int flag = 0;
     size_t prev = 0;
     size_t status = 0;
-
+    uint32_t dev_sparse_size = (n_tiles * single_tile_size);
+    uint32_t req_tiles = 0;
+  
     //Store sparse array as tile based index, so that we can read tile by tile on the device
     //Converting sparse array input datatype to uint32_t/float16, because device will not support double. 
     while(i < count){
@@ -277,6 +279,11 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
           status =0;
           prev = prev - ((inc + icn1 + prev) % 1024);
         }
+        if( (inc + icn1 + prev) >= dev_sparse_size){
+          dev_sparse_size = dev_sparse_size + single_tile_size;
+          dev_sparse.resize(dev_sparse_size);
+          req_tiles = req_tiles + 1;
+        }
         dev_sparse[ inc + icn1 + prev] = static_cast<uint32_t>(sparse[inc]);
       }
       if(flag == 1){
@@ -285,6 +292,8 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
         i = i + 1;
       } 
     }
+    
+    n_tiles = n_tiles + req_tiles;
   
     //Create dram buffers for sparse array
     //Initialize pattern and compute_pattern array in L1 Cache 
