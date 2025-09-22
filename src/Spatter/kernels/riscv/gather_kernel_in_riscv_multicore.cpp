@@ -1,5 +1,7 @@
 #include "debug/dprint.h"
 #include "dataflow_api.h"
+#include "tools/profiler/kernel_profiler.hpp"
+
 
 void kernel_main()
 {
@@ -23,6 +25,7 @@ void kernel_main()
     uint32_t single_tile_size =  get_arg_val<uint32_t>(11);
     uint32_t count = get_arg_val<uint32_t>(12);
     uint32_t num_cores = get_arg_val<uint32_t>(13);
+    uint32_t wrap = get_arg_val<uint32_t>(14);
 
 
     constexpr uint32_t sparse_cb_id0 = tt::CBIndex::c_0;
@@ -36,6 +39,8 @@ void kernel_main()
 
 
     uint32_t pattern_l1_write_addr_in1 = get_write_ptr(pattern_cb_id1);
+    noc_async_read(pattern_dram_addr, pattern_l1_write_addr_in1, pattern_tile_size);
+    noc_async_read_barrier();
     uint32_t dense_l1_write_addr_in1 = get_write_ptr(dense_cb_id1);
 
     
@@ -53,14 +58,7 @@ void kernel_main()
 
     uint32_t* data_pattern = (uint32_t*) pattern_l1_write_addr_in1;
     uint32_t* compute_dense = (uint32_t*) dense_l1_write_addr_in1;
-
-    for(uint32_t pattern_id = 0; pattern_id < pattern_length; pattern_id++){
-        *(data_pattern + pattern_id) = pattern_id * stride;
-    }
-
     uint32_t loop_count = single_tile_size / delta;
-    uint32_t max_iterations = count * pattern_length;
-    uint32_t dense_index=0;
     uint32_t extra_itr = 0;
 
     if(pattern_length % delta){
@@ -72,37 +70,23 @@ void kernel_main()
     for(uint32_t tile_id = num_tiles_written; tile_id < (num_tiles_written+num_output_tiles_per_core); tile_id++) {
         
         uint32_t cb_in0_addr = get_write_ptr(sparse_cb_id0);
-        noc_async_read_tile(tile_id, sparse_src_buf, cb_in0_addr); // read the tile into the circular buffer
+        noc_async_read_tile(tile_id, sparse_src_buf, cb_in0_addr); // read the tile into SRAM
         noc_async_read_barrier();
         uint32_t* data = (uint32_t*)cb_in0_addr;
         
         //Calculate loopcount for the last tile
-        if((core_id == (num_cores - 1)) && (extra_tile != 0)){
-            loop_count = stride * delta;
-            if((pattern_length % delta) == 0){
-                loop_count = loop_count - delta;
-            }
+        if((tile_id == (n_tiles - 1)) && (extra_tile != 0)) {
+            loop_count = count - (tile_id * loop_count);
         }
 
         for(uint32_t i = 0; i < loop_count; i++){
             for(uint32_t j = 0; j < pattern_length; j++){
-
-                uint32_t index_1 = (*(data_pattern+j) + delta * i);
-       
-                if(dense_index > 1023){
-                    dense_index = 0;
-                }
-
-                *(compute_dense + dense_index) = *(data + index_1);
-
-                //DPRINT << dense_index << " " << index_1 << " " << *(compute_sparse + dense_index) << ENDL();
-                dense_index = dense_index + 1;
+                *(compute_dense + (j + pattern_length * (i % wrap))) = *(data + (*(data_pattern+j) + delta * i));
             }
         }
     }
     //Write final core data to the DRAM
     if(core_id == (num_cores - 1)){
-        //DPRINT << "Core-id " << core_id << ENDL();
         noc_async_write_tile(0, dense_buf, dense_l1_write_addr_in1);
         noc_async_write_barrier();
     }

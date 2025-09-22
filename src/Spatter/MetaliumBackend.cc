@@ -294,17 +294,21 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
     }
     
     n_tiles = n_tiles + req_tiles;
+
+    for (size_t j = 0; j < pattern_length; j++) {
+      dev_pattern[j] = static_cast<uint32_t>(pattern[j]);
+    }
   
     //Create dram buffers for sparse array
     //Initialize pattern and compute_pattern array in L1 Cache 
     std::shared_ptr<tt::tt_metal::Buffer> dram_buffer_sparse = MakeBuffer(device, single_tile_size * n_tiles, single_tile_size, sizeof(uint32_t));
-    std::shared_ptr<tt::tt_metal::Buffer> dram_buffer_pattern = MakeBuffer_L1(device, single_tile_size, single_tile_size, sizeof(uint32_t));
+    std::shared_ptr<tt::tt_metal::Buffer> dram_buffer_pattern = MakeBuffer(device, single_tile_size, single_tile_size, sizeof(uint32_t));
     std::shared_ptr<tt::tt_metal::Buffer> dram_buffer_compute_pattern = MakeBuffer_L1(device, single_tile_size, single_tile_size, sizeof(uint32_t));
     std::shared_ptr<tt::tt_metal::Buffer> dram_buffer_dense;
 
     //Write data to the DRAM
     EnqueueWriteBuffer(cq, dram_buffer_sparse, dev_sparse, false);
-   // EnqueueWriteBuffer(cq, dram_buffer_pattern, dev_pattern, false);
+    EnqueueWriteBuffer(cq, dram_buffer_pattern, dev_pattern, false);
 
     if(is_parallel_mode_on){
       //Create a parallel region with the default function
@@ -338,13 +342,12 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
             core,
             {dram_buffer_sparse->address(),
             dram_buffer_pattern->address(),
-            n_tiles,
+            dram_buffer_compute_pattern->address(),
             num_tiles_written,
-            num_output_tiles_per_core, 
-            i, dram_buffer_compute_pattern->address(), pattern_length, delta, extra_tile, stride, single_tile_size, count, num_cores});
+            num_output_tiles_per_core});
 
-            SetRuntimeArgs(program, compute_kernel_handle, core, {1, num_tiles_written, num_output_tiles_per_core, i, num_cores});
-            SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_dense->address(), n_tiles, num_tiles_written, num_output_tiles_per_core, i, num_cores});
+            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, num_tiles_written, num_output_tiles_per_core, i, num_cores, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
+            SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_dense->address(), i, num_cores});
           }else{
             SetRuntimeArgs(program,
             data_read_kernel_handle,
@@ -354,7 +357,7 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
             n_tiles,
             num_tiles_written,
             num_output_tiles_per_core, 
-            i, dram_buffer_dense->address(), pattern_length, delta, extra_tile, stride, single_tile_size, count, num_cores});
+            i, dram_buffer_dense->address(), pattern_length, delta, extra_tile, stride, single_tile_size, count, num_cores, wrap});
           }
           num_tiles_written += num_output_tiles_per_core;
       }
@@ -362,11 +365,11 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
         //Output buffer creation in DRAM
         dram_buffer_dense = MakeBuffer(device, single_tile_size, single_tile_size, sizeof(uint32_t));
         if(is_compute_mode_on){
-          SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_sparse->address(), dram_buffer_pattern->address(), dram_buffer_compute_pattern->address(), n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count});
-          SetRuntimeArgs(program, compute_kernel_handle, core, {1});
-          SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_dense->address(), 1}); //Return only the final tile
+          SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_sparse->address(), dram_buffer_pattern->address(), dram_buffer_compute_pattern->address(), n_tiles});
+          SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
+          SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_dense->address()}); //Return only the final tile
         } else {
-          SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_sparse->address(), dram_buffer_pattern->address(), dram_buffer_dense->address(), n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count});
+          SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_sparse->address(), dram_buffer_pattern->address(), dram_buffer_dense->address(), n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
         }
 
     }
@@ -377,7 +380,9 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
 
     //Wait here for the device execution to be completed. 
     Finish(cq);
-    
+
+    tt_metal::DumpDeviceProfileResults(device, program);
+
     //End the timer
     auto end_time = std::chrono::high_resolution_clock::now();
 
@@ -387,21 +392,10 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
 
 #ifdef PRINT_DEBUG
     printf("TT Result : \n");
-    if(is_parallel_mode_on && (extra_tile != 0)){
-      uint32_t read_index = stride * delta;
-      if((pattern_length % delta) == 0){
-                read_index = read_index - delta;
-      }
-      for(uint32_t i= (read_index - 1) * pattern_length; i < (read_index * pattern_length); i++){
-        printf("%u ", dev_dense[i]);
-      }
 
-    } else {
-      for(uint32_t i= single_tile_size-pattern_length; i < (single_tile_size-pattern_length) + pattern_length; i++){
+    for(uint32_t i= 0; i < pattern_length; i++){
         printf("%u ", dev_dense[i]);
-      }
     }
-    
     printf("\n\n");
     printf("Expected Result : \n");
     for (size_t i = 0; i < count; ++i){

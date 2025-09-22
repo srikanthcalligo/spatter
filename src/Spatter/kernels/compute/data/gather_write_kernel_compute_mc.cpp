@@ -2,11 +2,10 @@
 
 void kernel_main(){
     uint32_t dst_addr  = get_arg_val<uint32_t>(0);
-    uint32_t n_tiles  = get_arg_val<uint32_t>(1);
-    uint32_t num_tiles_written = get_arg_val<uint32_t>(2);
-    uint32_t num_output_tiles_per_core = get_arg_val<uint32_t>(3);
-    uint32_t core_id = get_arg_val<uint32_t>(4);
-    uint32_t num_cores = get_arg_val<uint32_t>(5);
+    uint32_t core_id = get_arg_val<uint32_t>(1);
+    uint32_t num_cores = get_arg_val<uint32_t>(2);
+    
+    //DeviceZoneScopedN("TEST-FULL");
 
     if(core_id == (num_cores - 1)){
         constexpr uint32_t cb_id_out0 = tt::CBIndex::c_3;
@@ -17,7 +16,7 @@ void kernel_main(){
             .page_size = ublock_size_bytes,
             .data_format = DataFormat::UInt32,
         };
-        //Writing final tile off last thread to DRAM
+        //Writing final tile of last thread to DRAM
         cb_wait_front(cb_id_out0, 1);
         uint32_t cb_out0_addr = get_read_ptr(cb_id_out0);
         

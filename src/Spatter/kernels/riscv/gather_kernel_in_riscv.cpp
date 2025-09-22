@@ -14,6 +14,7 @@ void kernel_main()
     uint32_t stride =  get_arg_val<uint32_t>(7);
     uint32_t single_tile_size =  get_arg_val<uint32_t>(8);
     uint32_t count = get_arg_val<uint32_t>(9);
+    uint32_t wrap = get_arg_val<uint32_t>(10);
 
     constexpr uint32_t sparse_cb_id0 = tt::CBIndex::c_0;
     constexpr uint32_t pattern_cb_id1 = tt::CBIndex::c_1;
@@ -24,6 +25,8 @@ void kernel_main()
     uint32_t dense_tile_size = get_tile_size(dense_cb_id1);
     
     uint32_t pattern_l1_write_addr_in1 = get_write_ptr(pattern_cb_id1);
+    noc_async_read(pattern_dram_addr, pattern_l1_write_addr_in1, pattern_tile_size);
+    noc_async_read_barrier();
     uint32_t dense_l1_write_addr_in1 = get_write_ptr(dense_cb_id1);
     
     const InterleavedAddrGenFast<true> sparse_src_buf = {
@@ -39,15 +42,8 @@ void kernel_main()
     };
 
     uint32_t* data_pattern = (uint32_t*) pattern_l1_write_addr_in1;
-
-    for(uint32_t pattern_id = 0; pattern_id < pattern_length; pattern_id++){
-        *(data_pattern + pattern_id) = pattern_id * stride;
-    }
     uint32_t* compute_dense = (uint32_t*) dense_l1_write_addr_in1;
-
     uint32_t loop_count = single_tile_size / delta;
-    uint32_t max_iterations = count * pattern_length;
-    uint32_t dense_index=0;
     uint32_t extra_itr = 0;
 
     if(pattern_length % delta){
@@ -56,9 +52,6 @@ void kernel_main()
 
     loop_count = loop_count - extra_itr - (stride - 1);
 
-    uint32_t residual = 0;
-    //DPRINT << "No.of Tiles = " << n_tiles << " " << loop_count - (pattern_length - delta) - (stride - 1) << ENDL();
-
     for(uint32_t tile_id = 0; tile_id < n_tiles; tile_id++) {
         uint32_t cb_in0_addr = get_write_ptr(sparse_cb_id0);
         noc_async_read_tile(tile_id, sparse_src_buf, cb_in0_addr); // read the tile into the circular buffer
@@ -66,22 +59,11 @@ void kernel_main()
         uint32_t* data = (uint32_t*)cb_in0_addr;
 
         if((tile_id == (n_tiles - 1)) && (extra_tile != 0)){
-            residual = max_iterations - dense_index;
-            loop_count = stride * delta; //residual / pattern_length;
-            if((pattern_length % delta) == 0){
-                loop_count = loop_count - delta;
-            }
+            loop_count = count - (tile_id * loop_count);
         }
         for(uint32_t i = 0; i < loop_count; i++){
             for(uint32_t j = 0; j < pattern_length; j++){
-                
-                uint32_t index_1 = (*(data_pattern+j) + delta * i);
-
-                *(compute_dense + (dense_index % single_tile_size)) = *(data + index_1);
-
-                //DPRINT << dense_index << " " << index_1 << " " << *(compute_sparse + (dense_index % 1024)) << ENDL();
-                
-                dense_index = dense_index + 1;
+                *(compute_dense + (j + pattern_length * (i % wrap))) = *(data + (*(data_pattern+j) + delta * i));
             }
         }
     }
