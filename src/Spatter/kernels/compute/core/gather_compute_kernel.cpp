@@ -79,6 +79,9 @@ void MAIN {
     
     cb_push_back(cb_dense, 1);
     
+    cb_pop_front(cb_pattern, 1);   
+    cb_pop_front(cb_dense_inter, 1);
+    
     release_dst();
 }
 }
