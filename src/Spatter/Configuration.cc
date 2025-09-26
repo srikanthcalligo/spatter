@@ -1066,17 +1066,18 @@ void Configuration<Spatter::TT_Metalium>::multi_gather(bool timed, unsigned long
     setup();
     is_first_run = is_first_run + 1;
   }
-  printf("Not Implemented.....TBD\n");
-#if 0
+//  printf("Not Implemented.....TBD\n");
   if(is_compute_mode_on) {
-      printf("Not Implemented.....TBD\n");
+    kernel_exec_time = metalium_multi_gather_wrapper<uint32_t>(pattern, pattern_gather,
+                          sparse, dense, pattern_length, delta, wrap, count, is_compute_mode_on, is_parallel_mode_on,
+                          core, device_id, device, cq, program, single_tile_size,
+                          data_read_kernel_handle, data_write_kernel_handle, compute_kernel_handle);
   } else {
       kernel_exec_time = metalium_multi_gather_wrapper<uint32_t>(pattern, pattern_gather,
                           sparse, dense, pattern_length, delta, wrap, count, is_compute_mode_on, is_parallel_mode_on,
                           core, device_id, device, cq, program, single_tile_size,
                           data_read_kernel_handle, 0, 0);
   }
-#endif
 
   if (timed)
     time_seconds[run_id] = kernel_exec_time;
@@ -1187,7 +1188,29 @@ void Configuration<Spatter::TT_Metalium>::setup() {
       data_write_kernel_handle = Make_Write_NOC1_Kernel(core, core_set, is_parallel_mode_on, program, kernel_write_file_name);
       //Create Compute kernel Handler
       compute_kernel_handle = Make_Compute_Core_Kernel(core, core_set, is_parallel_mode_on, program, kernel_compute_file_name);
-    }    
+    }   
+    if(kernel.compare("multigather") == 0){
+      //Sparse circular buffer id
+      cb_sparse = MakeCircularBuffer_UInt32(core, core_set, is_parallel_mode_on, program, tt::CBIndex::c_0, num_tiles_per_cb, single_tile_size);
+      //Pattern array CB id  
+      cb_pattern = MakeCircularBuffer_UInt32(core, core_set, is_parallel_mode_on, program, tt::CBIndex::c_1, num_tiles_per_cb, single_tile_size);
+      //Pattern_gather array CB id  
+      cb_pattern_gather = MakeCircularBuffer_UInt32(core, core_set, is_parallel_mode_on, program, tt::CBIndex::c_2, num_tiles_per_cb, single_tile_size);
+
+      cb_compute_pattern = MakeCircularBuffer_UInt32(core, core_set, is_parallel_mode_on, program, tt::CBIndex::c_3, num_tiles_per_cb, single_tile_size);
+      //Dense array CB  id
+      cb_dense = MakeCircularBuffer_UInt32(core, core_set, is_parallel_mode_on, program, tt::CBIndex::c_4, num_tiles_per_cb, single_tile_size);
+      std::string kernel_read_file_name = kernel_file_path + (is_parallel_mode_on ? "compute/data/multigather_read_kernel_compute_mc.cpp" : "compute/data/multigather_read_kernel_compute.cpp");
+      std::string kernel_compute_file_name = kernel_file_path + (is_parallel_mode_on ? "compute/core/multigather_compute_kernel_mc.cpp" : "compute/core/multigather_compute_kernel.cpp");
+      std::string kernel_write_file_name = kernel_file_path + (is_parallel_mode_on ? "compute/data/multigather_write_kernel_compute_mc.cpp" : "compute/data/multigather_write_kernel_compute.cpp");
+      
+      //Create read kernel Handler
+      data_read_kernel_handle = Make_Read_NOC0_Kernel(core, core_set, is_parallel_mode_on, program, kernel_read_file_name);
+      //Create write kernel Handler
+      data_write_kernel_handle = Make_Write_NOC1_Kernel(core, core_set, is_parallel_mode_on, program, kernel_write_file_name);
+      //Create Compute kernel Handler
+      compute_kernel_handle = Make_Compute_Core_Kernel(core, core_set, is_parallel_mode_on, program, kernel_compute_file_name);
+    }
 
   } else { //For Riscv Mode
     if(kernel.compare("gather") == 0){
@@ -1214,8 +1237,22 @@ void Configuration<Spatter::TT_Metalium>::setup() {
       //Create read kernel Handler
       data_read_kernel_handle = Make_Read_NOC0_Kernel(core, core_set, is_parallel_mode_on, program, kernel_file_name);  
     }
+     if(kernel.compare("multigather") == 0){
+      //Sparse circular buffer id
+      cb_sparse = MakeCircularBuffer_UInt32(core, core_set, is_parallel_mode_on, program, tt::CBIndex::c_0, num_tiles_per_cb, single_tile_size);
+      //Pattern array CB id  
+      cb_pattern = MakeCircularBuffer_UInt32(core, core_set, is_parallel_mode_on, program, tt::CBIndex::c_1, num_tiles_per_cb, single_tile_size);
+      //Dense array CB  id
+      cb_pattern_gather = MakeCircularBuffer_UInt32(core, core_set, is_parallel_mode_on, program, tt::CBIndex::c_2, num_tiles_per_cb, single_tile_size);
+
+      cb_dense = MakeCircularBuffer_UInt32(core, core_set, is_parallel_mode_on, program, tt::CBIndex::c_3, num_tiles_per_cb, single_tile_size);
+
+      std::string kernel_file_name = kernel_file_path + (is_parallel_mode_on ? "riscv/multigather_kernel_in_riscv_multicore.cpp" : "riscv/multigather_kernel_in_riscv.cpp");
+      //Create read kernel Handler
+      data_read_kernel_handle = Make_Read_NOC0_Kernel(core, core_set, is_parallel_mode_on, program, kernel_file_name);
+    }
     //Spatter_gather
-    if((kernel.compare("sg") == 0) || (kernel.compare("multigather") == 0) || (kernel.compare("multiscatter") == 0)){
+    if((kernel.compare("sg") == 0) || (kernel.compare("multiscatter") == 0)){
       //gather pattern circular buffer id
       cb_pattern_gather = MakeCircularBuffer_UInt32(core, core_set, is_parallel_mode_on, program, tt::CBIndex::c_0, num_tiles_per_cb, single_tile_size);
       //Scatter pattern array CB id  
@@ -1230,10 +1267,7 @@ void Configuration<Spatter::TT_Metalium>::setup() {
         std::string kernel_file_name = kernel_file_path + (is_parallel_mode_on ? "riscv/scatter_gather_kernel_in_riscv_multicore.cpp" : "riscv/scatter_gather_kernel_in_riscv.cpp");
         data_read_kernel_handle = Make_Read_NOC0_Kernel(core, core_set, is_parallel_mode_on, program, kernel_file_name);
       }
-      if (kernel.compare("multigather") == 0){
-        std::string kernel_file_name = kernel_file_path + (is_parallel_mode_on ? "riscv/multi_gather_kernel_in_riscv_multicore.cpp" : "riscv/multi_gather_kernel_in_riscv.cpp");
-        data_read_kernel_handle = Make_Read_NOC0_Kernel(core, core_set, is_parallel_mode_on, program, kernel_file_name);
-      }
+  
       if (kernel.compare("multiscatter") == 0){
         std::string kernel_file_name = kernel_file_path + (is_parallel_mode_on ? "riscv/multi_scatter_kernel_in_riscv_multicore.cpp" : "riscv/multi_scatter_kernel_in_riscv.cpp");
         data_read_kernel_handle = Make_Read_NOC0_Kernel(core, core_set, is_parallel_mode_on, program, kernel_file_name);  
