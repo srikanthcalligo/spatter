@@ -70,14 +70,40 @@ Step 4 : To Run JSON test cases use Run_JSON_Tests.sh script file.
 				Ex: ./Run_TT_Json_Test.sh tt_metal/programming_examples/spatter/standard-suite/basic-tests/cpu-stream.json 0 0 2
 					(The above command will run the application in riscv mode and use single core) 
 
+
+Sample TestCases Commands:
+**************************
+#Gather
+./build_Release/tt_metal/programming_examples/spatter/spatter -p UNIFORM:8:1 -k gather -l $((2**24)) -b tt-metal -q 1 -i 0
+
+#Scatter
+./build_Release/tt_metal/programming_examples/spatter/spatter -p UNIFORM:8:1 -k scatter -l $((2**24)) -b tt-metal -q 1 -i 0
+
+#multi_scatter
+./build_Release/tt_metal/programming_examples/spatter/spatter -p UNIFORM:8:1 -u UNIFORM:8:1 -k multiscatter -l $((2**24)) -b tt-metal -q 1 -i 0
+
+#multi_gather
+./build_Release/tt_metal/programming_examples/spatter/spatter -p UNIFORM:8:1 -g UNIFORM:8:1 -k multigather -l $((2**24)) -b tt-metal -q 1 -i 0
+
+#scatter_gather
+./build_Release/tt_metal/programming_examples/spatter/spatter -p UNIFORM:8:1 -u UNIFORM:8:1 -g UNIFORM:8:1 -k sg -l $((2**24)) -b tt-metal -q 1 -i 0 
+
+
+Note: Change the value of flag "i" to 1 to run parallelly on the compute engine.
+
 Kernels Porting Status:
 ***********************
 
-KernelName       RISCV Version                Compute Version 
+KernelName       	RISCV Version                Compute Version 
 
-              Serial    Multicore          Serial    Multicore 
+              		Serial    Multicore          Serial    Multicore 
 
-gather          YES       YES                YES       YES 
+gather          	YES       YES                YES       YES
+scatter          	YES       YES                YES       YES
+multigather         YES       YES                YES       YES
+multiscatter        NO        NO                 YES       YES
+scatter_gather      NO        NO                 YES       YES 
 
  
+
 

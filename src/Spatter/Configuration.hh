@@ -299,7 +299,7 @@ private:
   CBHandle cb_sparse;
   CBHandle cb_dense;
   CBHandle cb_pattern;
-  CBHandle cb_compute_pattern;
+  CBHandle cb_intermediate;
   CBHandle cb_pattern_gather;
   CBHandle cb_pattern_scatter;
   CBHandle cb_sparse_gather;
