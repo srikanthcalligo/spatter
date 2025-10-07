@@ -390,7 +390,7 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
     std::vector<uint32_t> dev_dense(single_tile_size);
     EnqueueReadBuffer(cq, dram_buffer_dense, dev_dense, true);
 
-//#ifdef PRINT_DEBUG
+#ifdef PRINT_DEBUG
     int pass = 0;
     for (size_t i = 0; i < count; ++i){
       for (size_t j = 0; j < pattern_length; ++j){
@@ -413,7 +413,7 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
       printf("\nTest Failed.\n");
     }
     printf("\n");
-//#endif
+#endif
 
     std::chrono::duration<double> time_duration =  end_time - start_time;
     double elapsed_time = time_duration.count();
@@ -574,7 +574,7 @@ double metalium_scatter_wrapper(const aligned_vector<size_t> &pattern, aligned_v
     std::vector<T> dev_sparse(single_tile_size * n_tiles);
     EnqueueReadBuffer(cq, dram_buffer_sparse, dev_sparse, true);
 
-//#ifdef PRINT_DEBUG
+#ifdef PRINT_DEBUG
     std::vector<T> sparse_test(single_tile_size * n_tiles);
 
     //X86 Run
@@ -628,7 +628,7 @@ double metalium_scatter_wrapper(const aligned_vector<size_t> &pattern, aligned_v
       printf("\nTest Failed.\n");
     }
     printf("\n");
-//#endif
+#endif
 
     std::chrono::duration<double> time_duration =  end_time - start_time;
     double elapsed_time = time_duration.count();
@@ -809,7 +809,7 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
     //Final sparse_scatter array : Read tiles data from DRAM
     EnqueueReadBuffer(cq, dram_buffer_sparse_scatter, dev_sparse_scatter, true);
   
-//#ifdef PRINT_DEBUG
+#ifdef PRINT_DEBUG
 
     //X86 Run
     for (size_t i = 0; i < count; ++i){
@@ -868,7 +868,7 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
     printf("\n");
       
     
-//#endif
+#endif
 
   std::chrono::duration<double> time_duration =  end_time - start_time;
   double elapsed_time = time_duration.count();
@@ -1062,7 +1062,7 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
 
     EnqueueReadBuffer(cq, dram_buffer_dense, dev_dense, true);
 
-//#ifdef PRINT_DEBUG
+#ifdef PRINT_DEBUG
     //X86 Run
     for (size_t i = 0; i < count; ++i){
       for (size_t j = 0; j < pattern_length; ++j){
@@ -1082,7 +1082,7 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
       else
         printf("\nTest Passed.\n");
     
-//#endif
+#endif
 
     std::chrono::duration<double> time_duration =  end_time - start_time;
     double elapsed_time = time_duration.count();
@@ -1255,7 +1255,7 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
     std::vector<T> dev_sparse(single_tile_size * n_tiles);
     EnqueueReadBuffer(cq, dram_buffer_sparse, dev_sparse, true);
 
-//#ifdef PRINT_DEBUG
+#ifdef PRINT_DEBUG
     //X86 Run
     for (size_t i = 0; i < count; ++i){
       for (size_t j = 0; j < pattern_length; ++j){
@@ -1309,7 +1309,7 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
       printf("\nTest Failed.\n");
     }
     printf("\n");
-//#endif
+#endif
 
     std::chrono::duration<double> time_duration =  end_time - start_time;
     double elapsed_time = time_duration.count();

@@ -26,7 +26,7 @@
 
 namespace Spatter {
 static char *shortargs =
-    (char *)"ab:cd:e:f:g:hj:k:l:m:n:o:p:r:s::t:u:v:w:x:y:z:q:i:";
+    (char *)"ab:cd:e:f:g:hj:k:l:m:n:o:p:r:s::t:u:v:w:x:y:z:q:i:C:";
 const option longargs[] = {{"aggregate", no_argument, nullptr, 'a'},
     {"atomic-writes", required_argument, nullptr, 0},
     {"backend", required_argument, nullptr, 'b'},
@@ -53,7 +53,8 @@ const option longargs[] = {{"aggregate", no_argument, nullptr, 'a'},
     {"delta-scatter", required_argument, nullptr, 'y'},
     {"local-work-size", required_argument, nullptr, 'z'},
     {"tt-compute-mode", required_argument, nullptr, 'q'},
-    {"tt-parallel-mode", required_argument, nullptr, 'i'}};
+    {"tt-parallel-mode", required_argument, nullptr, 'i'},
+    {"tt-core-id", required_argument, nullptr, 'C'}};
 
 struct ClArgs {
   std::vector<std::unique_ptr<Spatter::ConfigurationBase>> configs;
@@ -83,6 +84,7 @@ struct ClArgs {
   //TT-Metalium : Added following two flags
   size_t tt_compute_mode;
   size_t tt_parallel_mode;
+  size_t tt_core_id;
 
   void report_header() {
 #ifdef USE_MPI
@@ -195,6 +197,8 @@ void help(char *progname) {
             << std::setw(40) << "Set 1 to run on TT-Metalium Compute Core" << std::left << "\n";
   std::cout << std::left << std::setw(10) << "-i (--tt-parallel-mode)"
             << std::setw(40) << "Set 1 to run TT-Metalium Parallel Version" << std::left << "\n";
+  std::cout << std::left << std::setw(10) << "-C (--tt-core-id)"
+            << std::setw(40) << "Pass id of the specific core to run" << std::left << "\n";
 }
 
 void usage(char *progname) {
@@ -207,7 +211,7 @@ void usage(char *progname) {
                "shared-memory] [-n name] [-o op]"
                "[-p pattern] [-r runs] [-s random] [-t nthreads] [-u inner "
                "scatter pattern] [-v "
-               "verbosity] [-w wrap] [-z local-work-size] [-q tt-compute-mode] [-i tt-parallel-mode]"
+               "verbosity] [-w wrap] [-z local-work-size] [-q tt-compute-mode] [-i tt-parallel-mode] [-C tt-core-id]"
             << std::endl;
 }
 
@@ -311,6 +315,7 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
   //TT-Metalium : Added following two flags
   size_t tt_compute_mode = 0;
   size_t tt_parallel_mode = 0;
+  size_t tt_core_id = 0;
 
   size_t delta_gather = 8;
   size_t delta_scatter = 8;
@@ -512,6 +517,10 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
       if (read_ul_arg(optarg, tt_parallel_mode, "Parsing Error: Invalid tt_parallel_mode") == -1)
         return -1;
       break;
+    case 'C':
+      if (read_ul_arg(optarg, tt_core_id, "Parsing Error: Invalid tt_core_id") == -1)
+        return -1;
+      break;
     case '?':
       usage(argv[0]);
       return -1;
@@ -537,9 +546,17 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
   cl.aggregate = aggregate;
   cl.compress = compress;
   cl.verbosity = verbosity;
-  //TT-Metalium : Added following two flags
+  //TT-Metalium : Added following three flags
   cl.tt_compute_mode = tt_compute_mode;
   cl.tt_parallel_mode = tt_parallel_mode;
+  cl.tt_core_id = tt_core_id;
+  if(tt_compute_mode < 0){
+    printf("Error : compute_mode value should be non-negative\n");
+  }
+
+  if(tt_parallel_mode < 0){
+    printf("Error : parallel_mode value should be non-negative\n");
+  }
 
 #ifdef USE_OPENMP
   int max_threads = omp_get_max_threads();
@@ -659,7 +676,7 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
           cl.dev_sparse_gather, cl.sparse_gather_size, cl.sparse_scatter,
           cl.dev_sparse_scatter, cl.sparse_scatter_size, cl.dense,
           cl.dense_perthread, cl.dev_dense, cl.dense_size, delta, delta_gather,
-          delta_scatter, seed, wrap, count, nruns, aggregate, verbosity, cl.tt_compute_mode, cl.tt_parallel_mode);
+          delta_scatter, seed, wrap, count, nruns, aggregate, verbosity, cl.tt_compute_mode, cl.tt_parallel_mode, cl.tt_core_id);
 #endif
 #ifdef USE_OPENMP
     else if (backend.compare("openmp") == 0)
@@ -696,7 +713,7 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
         cl.sparse_gather_size, cl.sparse_scatter, cl.dev_sparse_scatter,
         cl.sparse_scatter_size, cl.dense, cl.dense_perthread, cl.dev_dense,
         cl.dense_size, backend, aggregate, atomic, compress, shared_mem,
-        nthreads, verbosity, cl.tt_compute_mode, cl.tt_parallel_mode);
+        nthreads, verbosity, cl.tt_compute_mode, cl.tt_parallel_mode, cl.tt_core_id);
 #else
     Spatter::JSONParser json_file = Spatter::JSONParser(json_fname, cl.sparse,
         cl.dev_sparse, cl.sparse_size, cl.sparse_gather, cl.dev_sparse_gather,

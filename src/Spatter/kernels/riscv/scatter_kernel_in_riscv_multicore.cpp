@@ -60,7 +60,7 @@ void kernel_main()
 
     for(uint32_t tile_id = num_tiles_written; tile_id < (num_tiles_written+num_output_tiles_per_core); tile_id++) {
         uint32_t cb_in0_addr = get_write_ptr(sparse_cb_id0);
-        //noc_async_read_tile(tile_id, sparse_src_buf, cb_in0_addr); // read the tile into the circular buffer
+        //noc_async_read_tile(tile_id, sparse_src_buf, cb_in0_addr); // read the tile into the L1
         //noc_async_read_barrier();
         uint32_t* data = (uint32_t*)cb_in0_addr;
 

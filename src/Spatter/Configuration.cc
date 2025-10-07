@@ -939,7 +939,7 @@ Configuration<Spatter::TT_Metalium>::Configuration(const size_t id,
     double *&dev_dense, size_t &dense_size,const size_t delta,
     const size_t delta_gather, const size_t delta_scatter, const long int seed,
     const size_t wrap, const size_t count, const unsigned long nruns,
-    const bool aggregate, const unsigned long verbosity, size_t tt_compute_mode, size_t tt_parallel_mode)
+    const bool aggregate, const unsigned long verbosity, size_t tt_compute_mode, size_t tt_parallel_mode, size_t tt_core_id)
     : ConfigurationBase(id, name, kernel, pattern, pattern_gather,
           pattern_scatter, sparse, dev_sparse, sparse_size, sparse_gather,
           dev_sparse_gather, sparse_gather_size, sparse_scatter,
@@ -950,6 +950,17 @@ Configuration<Spatter::TT_Metalium>::Configuration(const size_t id,
 
   is_compute_mode_on = tt_compute_mode;
   is_parallel_mode_on = tt_parallel_mode;
+  
+  core_id = tt_core_id;
+  if(is_parallel_mode_on == 0){
+    if((core_id >= 0) && (core_id < 64)){
+      core = {core_id / 9, core_id % 9};
+      printf("\nCore ID = %zu  Grid_x  = %u Grid_y = %u\n", tt_core_id, core_id / 9, core_id % 9); 
+    }else{
+      printf("Core id should be less than 64\n");
+      exit(0);
+    }
+  }
   ConfigurationBase::setup();
 }
 

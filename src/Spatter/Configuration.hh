@@ -274,7 +274,7 @@ public:
       const size_t delta_gather, const size_t delta_scatter,
       const long int seed, const size_t wrap, const size_t count,
       const unsigned long nruns, const bool aggregate,
-      const unsigned long verbosity, size_t tt_compute_mode = 0, size_t tt_parallel_mode = 0);
+      const unsigned long verbosity, size_t tt_compute_mode = 0, size_t tt_parallel_mode = 0, size_t tt_core_id = 0);
 
 ~Configuration();
 
@@ -310,6 +310,7 @@ private:
 
   size_t is_compute_mode_on; //TT-Metalium : To run on the compute core
   uint32_t is_parallel_mode_on; //TT-Metalium : To run in parallel mode
+  uint32_t core_id = 0; //TT-metalium : To select the specific core id.
   uint32_t is_first_run = 0;
 
 };

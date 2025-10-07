@@ -38,12 +38,6 @@ void kernel_main()
         .data_format = DataFormat::UInt32, // The data format of the buffer
     };
 
-    /*const InterleavedAddrGenFast<true> dense_buf = {
-        .bank_base_address = dense_dram_addr,          // The base address of the buffer
-        .page_size = dense_tile_size,         // The size of a buffer page
-        .data_format = DataFormat::UInt32, // The data format of the buffer
-    };*/
-
     uint32_t* data_pattern = (uint32_t*) pattern_l1_write_addr_in1;
     uint32_t* compute_dense = (uint32_t*) dense_l1_write_addr_in1;
     uint32_t loop_count = single_tile_size / delta;
@@ -57,7 +51,7 @@ void kernel_main()
 
     for(uint32_t tile_id = 0; tile_id < n_tiles; tile_id++) {
         uint32_t cb_in0_addr = get_write_ptr(sparse_cb_id0);
-        //noc_async_read_tile(tile_id, sparse_src_buf, cb_in0_addr); // read the tile into the circular buffer
+        //noc_async_read_tile(tile_id, sparse_src_buf, cb_in0_addr); // read the tile into L1
         //noc_async_read_barrier();
         uint32_t* data = (uint32_t*)cb_in0_addr;
 
@@ -70,9 +64,9 @@ void kernel_main()
             }
         }
 
-         //Write last tile data to the DRAM
-    noc_async_write_tile(tile_id, sparse_src_buf, cb_in0_addr);
-    noc_async_write_barrier();
+        //Write last tile data to the DRAM
+    	noc_async_write_tile(tile_id, sparse_src_buf, cb_in0_addr);
+    	noc_async_write_barrier();
     }
    
 }
