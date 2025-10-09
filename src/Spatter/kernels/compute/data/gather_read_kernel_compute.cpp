@@ -28,17 +28,17 @@ void kernel_main()
         .data_format = DataFormat::UInt32, // The data format of the buffer
     };
 
-    cb_reserve_back(pattern_cb_id1, 1);
-    cb_reserve_back(compute_pattern_cb_id1, 1);
-
-    cb_push_back(pattern_cb_id1, 1);
-    cb_push_back(compute_pattern_cb_id1, 1);
-    
     for(uint32_t tile_id = 0; tile_id < n_tiles; tile_id++) {
         cb_reserve_back(sparse_cb_id0, 1);
+        cb_reserve_back(pattern_cb_id1, 1);
+        cb_reserve_back(compute_pattern_cb_id1, 1);
+
         uint32_t cb_in0_addr = get_write_ptr(sparse_cb_id0);
         noc_async_read_tile(tile_id, sparse_src_buf, cb_in0_addr); // read the tile into SRAM
         noc_async_read_barrier();
+        
         cb_push_back(sparse_cb_id0, 1);
+        cb_push_back(pattern_cb_id1, 1);
+        cb_push_back(compute_pattern_cb_id1, 1);
     }
 }
