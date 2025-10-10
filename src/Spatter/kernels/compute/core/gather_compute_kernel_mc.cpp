@@ -72,7 +72,8 @@ void MAIN {
         for(uint32_t i = 0; i < loop_count; i = i + 1){
             #pragma GCC unroll 8
             for(uint32_t j = 0; j < pattern_length; j++){
-                dense_addr_ptr[(j + pattern_length * (i % wrap))] = sparse_addr_ptr[(pattern_addr_ptr[j] + delta * i)];
+                //dense_addr_ptr[(j + pattern_length * (i % wrap))] = sparse_addr_ptr[(pattern_addr_ptr[j] + delta * i)];
+                dense_addr_ptr[j] = sparse_addr_ptr[j * stride + delta * i];
             }
         }
         
@@ -92,4 +93,5 @@ void MAIN {
     }
 }
 }
+
 

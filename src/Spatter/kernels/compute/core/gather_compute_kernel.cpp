@@ -22,6 +22,8 @@ void MAIN {
     uint32_t count = get_arg_val<uint32_t>(6);
     uint32_t wrap = get_arg_val<uint32_t>(7);
     uint32_t loop_count = single_tile_size / delta;
+
+    //DPRINT << pattern_length << ENDL();
     uint32_t extra_itr = 0;
 
     if(pattern_length % delta){
@@ -39,7 +41,9 @@ void MAIN {
 
     unary_op_init_common(cb_dense_inter, cb_dense);
     copy_tile_init(cb_dense_inter);
-    
+
+    DPRINT << "TRISC" << ENDL();
+
     for(uint32_t tile_id = 0; tile_id < n_tiles; tile_id++)
     {
         acquire_dst();
@@ -66,9 +70,11 @@ void MAIN {
         }
 
         for(uint32_t i = 0; i < loop_count; i++){
+            uint32_t sparse_index = delta * i;
             #pragma GCC unroll 8
             for(uint32_t j = 0; j < pattern_length; j++){
-                dense_addr_ptr[(j + pattern_length * (i % wrap))] = sparse_addr_ptr[(pattern_addr_ptr[j] + delta * i)];
+                //dense_addr_ptr[(j + pattern_length * (i % wrap))] = sparse_addr_ptr[(pattern_addr_ptr[j] + delta * i)];
+                dense_addr_ptr[j] = sparse_addr_ptr[(j * stride + sparse_index)];
             }
         }
        
@@ -91,3 +97,4 @@ void MAIN {
     }
 }
 }
+

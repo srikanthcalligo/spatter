@@ -29,14 +29,15 @@ void kernel_main()
     };
 
     for(uint32_t tile_id = 0; tile_id < n_tiles; tile_id++) {
+        //Reserve the memory for the below tiles in CB
         cb_reserve_back(sparse_cb_id0, 1);
         cb_reserve_back(pattern_cb_id1, 1);
         cb_reserve_back(compute_pattern_cb_id1, 1);
-
+        //Read the sparse array tile by tile
         uint32_t cb_in0_addr = get_write_ptr(sparse_cb_id0);
         noc_async_read_tile(tile_id, sparse_src_buf, cb_in0_addr); // read the tile into SRAM
         noc_async_read_barrier();
-        
+        //Write below tiles to CB
         cb_push_back(sparse_cb_id0, 1);
         cb_push_back(pattern_cb_id1, 1);
         cb_push_back(compute_pattern_cb_id1, 1);
