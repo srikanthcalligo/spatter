@@ -2,6 +2,7 @@
 
 #include "Configuration.hh"
 #include <chrono>
+#include <cmath>
 
 CBHandle MakeCircularBuffer_UInt32(CoreCoord core, CoreRangeSet core_set, uint32_t is_parallel_mode_on, Program &program, tt::CBIndex cb_index, uint32_t num_tiles_per_cb, uint32_t single_tile_size)
 {
@@ -163,30 +164,18 @@ std::shared_ptr<tt::tt_metal::Buffer> MakeBuffer_BFloat16(IDevice *device, uint3
 }
 
 //Gather Kernel
-template double metalium_gather_wrapper<bfloat16>(const aligned_vector<size_t> &pattern, const aligned_vector<double> &sparse,
-    aligned_vector<double> &dense, const size_t pattern_length, const size_t delta,
-    const size_t wrap, const size_t count, bool is_compute_mode_on, uint32_t is_parallel_mode_on,
-    CoreCoord core, uint32_t device_id, IDevice *device, CommandQueue& cq, Program &program, uint32_t single_tile_size,
-    KernelHandle data_read_kernel_handle, KernelHandle data_write_kernel_handle, KernelHandle compute_kernel_handle);
-
 template double metalium_gather_wrapper<uint32_t>(const aligned_vector<size_t> &pattern, const aligned_vector<double> &sparse,
     aligned_vector<double> &dense, const size_t pattern_length, const size_t delta,
     const size_t wrap, const size_t count, bool is_compute_mode_on, uint32_t is_parallel_mode_on,
+    size_t step_size, size_t is_nr_enabled,
     CoreCoord core, uint32_t device_id, IDevice *device, CommandQueue& cq, Program &program, uint32_t single_tile_size,
     KernelHandle data_read_kernel_handle, KernelHandle data_write_kernel_handle, KernelHandle compute_kernel_handle);
 
 //Scatter Kernel
-#if 0
-template double metalium_scatter_wrapper<bfloat16>(const aligned_vector<size_t> &pattern, aligned_vector<double> &sparse,
-    const aligned_vector<double> &dense, const size_t pattern_length, const size_t delta,
-    const size_t wrap, const size_t count, bool is_compute_mode_on, uint32_t is_parallel_mode_on,
-    CoreCoord core, uint32_t device_id, IDevice *device, CommandQueue& cq, Program &program, uint32_t single_tile_size,
-    KernelHandle data_read_kernel_handle, KernelHandle data_write_kernel_handle, KernelHandle compute_kernel_handle);
-#endif
-
 template double metalium_scatter_wrapper<uint32_t>(const aligned_vector<size_t> &pattern, aligned_vector<double> &sparse,
     const aligned_vector<double> &dense, const size_t pattern_length, const size_t delta,
     const size_t wrap, const size_t count, bool is_compute_mode_on, uint32_t is_parallel_mode_on,
+    size_t step_size, size_t is_nr_enabled,
     CoreCoord core, uint32_t device_id, IDevice *device, CommandQueue& cq, Program &program, uint32_t single_tile_size,
     KernelHandle data_read_kernel_handle, KernelHandle data_write_kernel_handle, KernelHandle compute_kernel_handle);
 
@@ -196,24 +185,17 @@ template double metalium_scatter_gather_wrapper<uint32_t>(const aligned_vector<s
     const aligned_vector<double> &sparse_gather, const size_t pattern_length,
     const size_t delta_scatter, const size_t delta_gather, const size_t wrap,
     const size_t count, bool is_compute_mode_on,uint32_t is_parallel_mode_on,
+    size_t step_size, size_t is_nr_enabled,
     CoreCoord core, uint32_t device_id, IDevice *device,
     CommandQueue& cq, Program &program, uint32_t single_tile_size, 
     KernelHandle data_read_kernel_handle, KernelHandle data_write_kernel_handle, KernelHandle compute_kernel_handle);
-#if 0
-template double metalium_scatter_gather_wrapper<bfloat16>(const aligned_vector<size_t> &pattern_scatter,
-    aligned_vector<double> &sparse_scatter, const aligned_vector<size_t> &pattern_gather,
-    const aligned_vector<double> &sparse_gather, const size_t pattern_length,
-    const size_t delta_scatter, const size_t delta_gather, const size_t wrap,
-    const size_t count, bool is_compute_mode_on,uint32_t is_parallel_mode_on,
-    CoreCoord core, uint32_t device_id, IDevice *device,
-    CommandQueue& cq, Program &program, uint32_t single_tile_size, 
-    KernelHandle data_read_kernel_handle, KernelHandle data_write_kernel_handle, KernelHandle compute_kernel_handle);
-#endif
-//multi_gather
+
+    //multi_gather
 template double metalium_multi_gather_wrapper<uint32_t>(const aligned_vector<size_t> &pattern,
     const aligned_vector<size_t> &pattern_gather, const aligned_vector<double> &sparse, aligned_vector<double> &dense,
     const size_t pattern_length, const size_t delta, const size_t wrap,
     const size_t count, bool is_compute_mode_on,uint32_t is_parallel_mode_on,
+    size_t step_size, size_t is_nr_enabled,
     CoreCoord core, uint32_t device_id, IDevice *device,
     CommandQueue& cq, Program &program, uint32_t single_tile_size, 
     KernelHandle data_read_kernel_handle, KernelHandle data_write_kernel_handle, KernelHandle compute_kernel_handle);
@@ -223,6 +205,7 @@ template double metalium_multi_scatter_wrapper<uint32_t>(const aligned_vector<si
     const aligned_vector<size_t> &pattern_scatter, aligned_vector<double> &sparse, const aligned_vector<double> &dense,
     const size_t pattern_length, const size_t delta, const size_t wrap,
     const size_t count, bool is_compute_mode_on,uint32_t is_parallel_mode_on,
+    size_t step_size, size_t is_nr_enabled,
     CoreCoord core, uint32_t device_id, IDevice *device,
     CommandQueue& cq, Program &program, uint32_t single_tile_size, 
     KernelHandle data_read_kernel_handle, KernelHandle data_write_kernel_handle, KernelHandle compute_kernel_handle);
@@ -232,24 +215,21 @@ template<typename T>
 double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const aligned_vector<double> &sparse,
     aligned_vector<double> &dense, const size_t pattern_length, const size_t delta,
     const size_t wrap, const size_t count, bool is_compute_mode_on, uint32_t is_parallel_mode_on,
+    size_t step_size, size_t is_nr_enabled,
     CoreCoord core, uint32_t device_id, IDevice *device,
     CommandQueue& cq, Program &program, uint32_t single_tile_size,
     KernelHandle data_read_kernel_handle, KernelHandle data_write_kernel_handle, KernelHandle compute_kernel_handle) {
     
     //Divide sparse array into tiles
-    uint32_t n_tiles = (sparse.size()) / single_tile_size;
+    uint32_t n_tiles = (sparse.size() / single_tile_size);
     n_tiles = (sparse.size() % single_tile_size == 0 ) ? n_tiles : n_tiles + 1;
-
-#ifdef PRINT_DEBUG
-    std::cout << "No.of Tiles : " << n_tiles << std::endl;
-#endif
 
     //Initialize device buffers. 
     std::vector<uint32_t> dev_sparse(n_tiles * single_tile_size);
     std::vector<uint32_t> dev_pattern(single_tile_size);
     std::vector<uint32_t> compute_pattern(single_tile_size);
 
-    uint32_t stride = pattern[1];
+    uint32_t stride = step_size;
     uint32_t iin = 0, icn = 1;
     uint32_t extra_tile = sparse.size() % single_tile_size;
 
@@ -265,11 +245,11 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
     while(i < count){
       for (size_t j = 0; j < pattern_length; j++) {
         inc = pattern[j] + delta * i;                    
-        if((i*delta+(pattern_length - 1) * pattern[1]) >= (iter * 1024)){
-                    icn1 = icn1 + (iter * 1024) - (i * delta);
+        if((i*delta+(pattern_length - 1) * step_size) >= (iter * single_tile_size)){
+                    icn1 = icn1 + (iter * single_tile_size) - (i * delta);
                     iter = iter + 1;
         }        
-        if(( inc + icn1 + prev) >= (iter * 1024)){
+        if(( inc + icn1 + prev) >= (iter * single_tile_size)){
           flag = 1;
           status = 1;
           prev = icn1 + prev;
@@ -279,7 +259,7 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
       
         if(status){
           status =0;
-          prev = prev - ((inc + icn1 + prev) % 1024);
+          prev = prev - ((inc + icn1 + prev) % single_tile_size);
         }
         if( (inc + icn1 + prev) >= dev_sparse_size){
           dev_sparse_size = dev_sparse_size + single_tile_size;
@@ -297,6 +277,11 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
     
     n_tiles = n_tiles + req_tiles;
 
+#ifdef PRINT_DEBUG
+    std::cout << "No.of Tiles : " << n_tiles << std::endl;
+#endif
+
+  
     for (size_t j = 0; j < pattern_length; j++) {
       dev_pattern[j] = static_cast<uint32_t>(pattern[j]);
     }
@@ -346,7 +331,7 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
             num_tiles_written,
             num_output_tiles_per_core});
 
-            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, num_tiles_written, num_output_tiles_per_core, i, num_cores, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
+            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, num_tiles_written, num_output_tiles_per_core, i, num_cores, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap, is_nr_enabled});
             SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_dense->address(), i, num_cores});
           }else{
             SetRuntimeArgs(program,
@@ -366,13 +351,14 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
         dram_buffer_dense = MakeBuffer(device, single_tile_size, single_tile_size, sizeof(uint32_t));
         if(is_compute_mode_on){
           SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_sparse->address(), dram_buffer_pattern->address(), dram_buffer_compute_pattern->address(), n_tiles});
-          SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
+          SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap, is_nr_enabled});
           SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_dense->address()}); //Return only the final tile
         } else {
           SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_sparse->address(), dram_buffer_pattern->address(), dram_buffer_dense->address(), n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
         }
 
     }
+    
     
     //Start the timer
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -404,7 +390,7 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
     for(uint32_t i= 0; i < pattern_length; i++){
         if(dev_dense[i] != static_cast<uint32_t>(dense[i])){
            pass=1;
-           break; 
+           break;
         }
     }
     if(pass == 0){
@@ -426,6 +412,7 @@ template<typename T>
 double metalium_scatter_wrapper(const aligned_vector<size_t> &pattern, aligned_vector<double> &sparse,
     const aligned_vector<double> &dense, const size_t pattern_length, const size_t delta,
     const size_t wrap, const size_t count, bool is_compute_mode_on,uint32_t is_parallel_mode_on,
+    size_t step_size, size_t is_nr_enabled,
     CoreCoord core, uint32_t device_id, IDevice *device,
     CommandQueue& cq, Program &program, uint32_t single_tile_size,
     KernelHandle data_read_kernel_handle, KernelHandle data_write_kernel_handle, KernelHandle compute_kernel_handle) {
@@ -441,15 +428,11 @@ double metalium_scatter_wrapper(const aligned_vector<size_t> &pattern, aligned_v
     uint32_t dev_sparse_size = (n_tiles * single_tile_size);
     uint32_t req_tiles = 0;
 
-#ifdef PRINT_DEBUG
-    std::cout << "No.of Tiles : " << n_tiles << std::endl;
-#endif
-
     //Convert input double to the required format. 
     std::vector<T> dev_dense(single_tile_size);
     std::vector<T> dev_pattern(single_tile_size);
 
-    uint32_t stride = pattern[1];
+    uint32_t stride = step_size;
     uint32_t remainder = single_tile_size % pattern_length;
     uint32_t extra_tile = sparse.size() % single_tile_size;
 
@@ -466,11 +449,11 @@ double metalium_scatter_wrapper(const aligned_vector<size_t> &pattern, aligned_v
     while(i < count){
       for (size_t j = 0; j < pattern_length; j++) {
         inc = pattern[j] + delta * i;                    
-        if((i*delta+(pattern_length - 1) * pattern[1]) >= (iter * 1024)){
-                    icn1 = icn1 + (iter * 1024) - (i * delta);
+        if((i*delta+(pattern_length - 1) * step_size) >= (iter * single_tile_size)){
+                    icn1 = icn1 + (iter * single_tile_size) - (i * delta);
                     iter = iter + 1;
         }        
-        if(( inc + icn1 + prev) >= (iter * 1024)){
+        if(( inc + icn1 + prev) >= (iter * single_tile_size)){
           flag = 1;
           status = 1;
           prev = icn1 + prev;
@@ -480,7 +463,7 @@ double metalium_scatter_wrapper(const aligned_vector<size_t> &pattern, aligned_v
       
         if(status){
           status =0;
-          prev = prev - ((inc + icn1 + prev) % 1024);
+          prev = prev - ((inc + icn1 + prev) % single_tile_size);
         }
         if( (inc + icn1 + prev) >= dev_sparse_size){
           dev_sparse_size = dev_sparse_size + single_tile_size;
@@ -497,6 +480,10 @@ double metalium_scatter_wrapper(const aligned_vector<size_t> &pattern, aligned_v
     }
     
     n_tiles = n_tiles + req_tiles;
+
+#ifdef PRINT_DEBUG
+    std::cout << "No.of Tiles : " << n_tiles << std::endl;
+#endif
 
     //Create dram buffers for input and output arrays
     std::shared_ptr<tt::tt_metal::Buffer> dram_buffer_sparse = MakeBuffer(device, single_tile_size * n_tiles, single_tile_size, sizeof(T));
@@ -532,7 +519,7 @@ double metalium_scatter_wrapper(const aligned_vector<size_t> &pattern, aligned_v
           }
           if(is_compute_mode_on){
             SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_dense->address(), dram_buffer_pattern->address(), dram_buffer_sparse_inter->address(), n_tiles, num_tiles_written, num_output_tiles_per_core});
-            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap, num_tiles_written, num_output_tiles_per_core});
+            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap, num_tiles_written, num_output_tiles_per_core, is_nr_enabled});
             SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_sparse->address(), n_tiles, num_tiles_written, num_output_tiles_per_core});
           }else{
             SetRuntimeArgs(program, data_read_kernel_handle, core,
@@ -547,11 +534,8 @@ double metalium_scatter_wrapper(const aligned_vector<size_t> &pattern, aligned_v
 
           if(is_compute_mode_on){
             SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_dense->address(), dram_buffer_pattern->address(), dram_buffer_sparse_inter->address(), n_tiles});
-            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
+            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap, is_nr_enabled});
             SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_sparse->address(), n_tiles});
-            //SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_dense->address(), dram_buffer_pattern->address(), dram_buffer_sparse_inter->address(), n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
-            //SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles});
-            //SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_sparse->address(), n_tiles});
           } else {
             SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_dense->address(), dram_buffer_pattern->address(), dram_buffer_sparse->address(), n_tiles,pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
           }
@@ -588,12 +572,14 @@ double metalium_scatter_wrapper(const aligned_vector<size_t> &pattern, aligned_v
     uint32_t loop_count = single_tile_size / delta;
     uint32_t extra_itr = 0;
     uint32_t idx = 0;
+    
+    if(is_nr_enabled != 1){
+      if(pattern_length % delta){
+          extra_itr = 1;
+      }
 
-    if(pattern_length % delta){
-        extra_itr = 1;
+      loop_count = loop_count - extra_itr - (stride - 1);
     }
-
-    loop_count = loop_count - extra_itr - (stride - 1);
 
     unsigned long ii = 0;
     for(uint32_t tile_id = 0; tile_id < n_tiles; tile_id++)
@@ -643,6 +629,7 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
     const aligned_vector<double> &sparse_gather, const size_t pattern_length,
     const size_t delta_scatter, const size_t delta_gather, const size_t wrap,
     const size_t count, bool is_compute_mode_on,uint32_t is_parallel_mode_on,
+    size_t step_size, size_t is_nr_enabled,
     CoreCoord core, uint32_t device_id, IDevice *device,
     CommandQueue& cq, Program &program, uint32_t single_tile_size, 
     KernelHandle data_read_kernel_handle, KernelHandle data_write_kernel_handle, KernelHandle compute_kernel_handle)
@@ -654,11 +641,6 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
 
     uint32_t n_tiles_gather = compute_tiles(sparse_gather.size(), single_tile_size);
     uint32_t n_tiles_scatter = compute_tiles(sparse_scatter.size(), single_tile_size);
-
-#ifdef PRINT_DEBUG
-    std::cout << "Tiles gather: " << n_tiles_gather
-              << ", Tiles scatter: " << n_tiles_scatter << std::endl;
-#endif
 
     //Initialize device buffers. 
     std::vector<uint32_t> dev_sparse_gather(n_tiles_gather * single_tile_size);
@@ -683,11 +665,11 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
     while(i < count){
       for (size_t j = 0; j < pattern_length; j++) {
         inc = pattern_gather[j] + delta_gather * i;                    
-        if((i*delta_gather+(pattern_length - 1) * pattern_gather[1]) >= (iter * 1024)){
+        if((i*delta_gather+(pattern_length - 1) * stride) >= (iter * single_tile_size)){
                     icn1 = icn1 + (iter * 1024) - (i * delta_gather);
                     iter = iter + 1;
         }        
-        if(( inc + icn1 + prev) >= (iter * 1024)){
+        if(( inc + icn1 + prev) >= (iter * single_tile_size)){
           flag = 1;
           status = 1;
           prev = icn1 + prev;
@@ -697,7 +679,7 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
       
         if(status){
           status =0;
-          prev = prev - ((inc + icn1 + prev) % 1024);
+          prev = prev - ((inc + icn1 + prev) % single_tile_size);
         }
         if( (inc + icn1 + prev) >= dev_sparse_gather_size){
           dev_sparse_gather_size = dev_sparse_gather_size + single_tile_size;
@@ -716,14 +698,18 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
     
     n_tiles_gather = n_tiles_gather + req_tiles;
 
+#ifdef PRINT_DEBUG
+    std::cout << "Tiles gather: " << n_tiles_gather
+              << ", Tiles scatter: " << n_tiles_scatter << std::endl;
+#endif
+
     for (size_t j = 0; j < pattern_length; j++) {
       dev_pattern_gather[j] = static_cast<uint32_t>(pattern_gather[j]);
       dev_pattern_scatter[j] = static_cast<uint32_t>(pattern_scatter[j]);
       
-    #ifdef PRINT_DEBUG
+#ifdef PRINT_DEBUG_V0
       printf(" %u %u \n", dev_pattern_gather[j],dev_pattern_scatter[j]);
-    #endif
-      
+#endif      
     }
   
     //Create dram buffers for sparse array
@@ -783,7 +769,7 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
        }
     } else {
         //Output buffer creation in DRAM
-      //  dram_buffer_sparse_scatter = MakeBuffer(device, single_tile_size, single_tile_size, sizeof(uint32_t));
+        //  dram_buffer_sparse_scatter = MakeBuffer(device, single_tile_size, single_tile_size, sizeof(uint32_t));
         if(is_compute_mode_on){
           SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_sparse_gather->address(), dram_buffer_pattern_gather->address(),  dram_buffer_pattern_scatter->address(), dram_buffer_sparse_inter->address(), n_tiles_gather});
           SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles_gather, pattern_length, delta_gather, delta_scatter, extra_tile, stride, single_tile_size, count, wrap});
@@ -827,11 +813,13 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
     uint32_t extra_itr = 0;
     uint32_t idx = 0;
 
-    if(pattern_length % delta_gather){
-        extra_itr = 1;
-    }
+    if(is_nr_enabled != 1){
+      if(pattern_length % delta_gather){
+          extra_itr = 1;
+      }
 
-    loop_count = loop_count - extra_itr - (stride - 1);
+      loop_count = loop_count - extra_itr - (stride - 1);
+    }
 
     uint32_t ii = 0;
     for(uint32_t tile_id = 0; tile_id < n_tiles_gather; tile_id++)
@@ -882,6 +870,7 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
     const aligned_vector<size_t> &pattern_gather, const aligned_vector<double> &sparse, aligned_vector<double> &dense,
     const size_t pattern_length, const size_t delta, const size_t wrap,
     const size_t count, bool is_compute_mode_on,uint32_t is_parallel_mode_on,
+    size_t step_size, size_t is_nr_enabled,
     CoreCoord core, uint32_t device_id, IDevice *device,
     CommandQueue& cq, Program &program, uint32_t single_tile_size, 
     KernelHandle data_read_kernel_handle, KernelHandle data_write_kernel_handle, KernelHandle compute_kernel_handle)
@@ -890,10 +879,6 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
     //Divide sparse array into tiles
     uint32_t n_tiles = (sparse.size()) / single_tile_size;
     n_tiles = (sparse.size() % single_tile_size == 0 ) ? n_tiles : n_tiles + 1;
-
-#ifdef PRINT_DEBUG
-  //  std::cout << "No.of Tiles : " << n_tiles << std::endl;
-#endif
   
     //Initialize device buffers. 
     std::vector<uint32_t> dev_sparse(n_tiles * single_tile_size);
@@ -913,21 +898,17 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
     size_t status = 0;
     uint32_t dev_sparse_size = (n_tiles * single_tile_size);
     uint32_t req_tiles = 0;
-    
-  #ifdef PRINT_DEBUG
-   // std::cout << "dev_sparse_size : " << dev_sparse_size << std::endl;
-  #endif
 
     //Store sparse array as tile based index, so that we can read tile by tile on the device
     //Converting sparse array input datatype to uint32_t/float16, because device will not support double. 
     while(i < count){
       for (size_t j = 0; j < pattern_length; j++) {
         inc = pattern[pattern_gather[j]] + delta * i;                    
-        if((i*delta+(pattern_length - 1) * pattern[pattern_gather[1]]) >= (iter * 1024)){
-                    icn1 = icn1 + (iter * 1024) - (i * delta);
+        if((i*delta+(pattern_length - 1) * stride) >= (iter * single_tile_size)){
+                    icn1 = icn1 + (iter * single_tile_size) - (i * delta);
                     iter = iter + 1;
         }        
-        if(( inc + icn1 + prev) >= (iter * 1024)){
+        if(( inc + icn1 + prev) >= (iter * single_tile_size)){
           flag = 1;
           status = 1;
           prev = icn1 + prev;
@@ -937,7 +918,7 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
       
         if(status){
           status =0;
-          prev = prev - ((inc + icn1 + prev) % 1024);
+          prev = prev - ((inc + icn1 + prev) % single_tile_size);
         }
         if( (inc + icn1 + prev) >= dev_sparse_size){
           dev_sparse_size = dev_sparse_size + single_tile_size;
@@ -945,10 +926,6 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
           req_tiles = req_tiles + 1;
         }
         dev_sparse[ inc + icn1 + prev] = static_cast<uint32_t>(sparse[inc]);
-  #ifdef PRINT_DEBUG
-   //std::cout << "dev_sparse[ " <<  inc + icn1 + prev << " ]= "<< dev_sparse[ inc + icn1 + prev]  << ": sparse[" << inc << "]= " <<sparse[inc] << std::endl;
-  #endif
-
       }
       if(flag == 1){
         flag = 0;
@@ -958,9 +935,11 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
     }
 
     n_tiles = n_tiles + req_tiles;
-    #ifdef PRINT_DEBUG
-     // std::cout << "No.of tiles : " << n_tiles << std::endl;
-    #endif 
+
+#ifdef PRINT_DEBUG
+    std::cout << "No.of tiles : " << n_tiles << std::endl;
+#endif 
+
     for (size_t j = 0; j < pattern_length; j++) {
       dev_pattern[j] = static_cast<uint32_t>(pattern[j]);
       dev_pattern_gather[j] = static_cast<uint32_t>(pattern_gather[j]);
@@ -981,14 +960,13 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
     EnqueueWriteBuffer(cq, dram_buffer_pattern_gather, dev_pattern_gather, false);
 
     if(is_parallel_mode_on){
-      //implement TBD
       //Create a parallel region with the default function
       auto compute_with_storage_grid_size = device->compute_with_storage_grid_size();
       uint32_t num_cores_x = compute_with_storage_grid_size.x;
       uint32_t num_cores_y = compute_with_storage_grid_size.y;
       auto [num_cores, all_cores, core_group_1, core_group_2, num_output_tiles_per_core_group_1, num_output_tiles_per_core_group_2] = split_work_to_cores(compute_with_storage_grid_size, n_tiles);
 #ifdef PRINT_DEBUG
-    //  std::cout << "No.of Cores : " << num_cores << std::endl;
+      std::cout << "No.of Cores : " << num_cores << std::endl;
 #endif        
       no_cores = num_cores;
       //Output buffer creation in DRAM
@@ -1096,6 +1074,7 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
     const aligned_vector<size_t> &pattern_scatter, aligned_vector<double> &sparse, const aligned_vector<double> &dense,
     const size_t pattern_length, const size_t delta, const size_t wrap,
     const size_t count, bool is_compute_mode_on,uint32_t is_parallel_mode_on,
+    size_t step_size, size_t is_nr_enabled,
     CoreCoord core, uint32_t device_id, IDevice *device,
     CommandQueue& cq, Program &program, uint32_t single_tile_size, 
     KernelHandle data_read_kernel_handle, KernelHandle data_write_kernel_handle, KernelHandle compute_kernel_handle)
@@ -1111,10 +1090,6 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
     size_t status = 0;
     uint32_t dev_sparse_size = (n_tiles * single_tile_size);
     uint32_t req_tiles = 0;
-
-#ifdef PRINT_DEBUG
-    std::cout << "No.of Tiles : " << n_tiles << std::endl;
-#endif
 
     //Convert input double to the required format. 
     std::vector<T> dev_dense(single_tile_size);
@@ -1142,11 +1117,11 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
     while(i < count){
       for (size_t j = 0; j < pattern_length; j++) {
         inc = pattern[j] + delta * i;                    
-        if((i*delta+(pattern_length - 1) * pattern[1]) >= (iter * 1024)){
-                    icn1 = icn1 + (iter * 1024) - (i * delta);
+        if((i*delta+(pattern_length - 1) * pattern[1]) >= (iter * single_tile_size)){
+                    icn1 = icn1 + (iter * single_tile_size) - (i * delta);
                     iter = iter + 1;
         }        
-        if(( inc + icn1 + prev) >= (iter * 1024)){
+        if(( inc + icn1 + prev) >= (iter * single_tile_size)){
           flag = 1;
           status = 1;
           prev = icn1 + prev;
@@ -1156,7 +1131,7 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
       
         if(status){
           status =0;
-          prev = prev - ((inc + icn1 + prev) % 1024);
+          prev = prev - ((inc + icn1 + prev) % single_tile_size);
         }
         if( (inc + icn1 + prev) >= dev_sparse_size){
           dev_sparse_size = dev_sparse_size + single_tile_size;
@@ -1172,6 +1147,9 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
     
     n_tiles = n_tiles + req_tiles;
 
+#ifdef PRINT_DEBUG
+    std::cout << "No.of Tiles : " << n_tiles << std::endl;
+#endif
     //Create dram buffers for input and output arrays
     std::shared_ptr<tt::tt_metal::Buffer> dram_buffer_sparse = MakeBuffer(device, single_tile_size * n_tiles, single_tile_size, sizeof(T));
     std::shared_ptr<tt::tt_metal::Buffer> dram_buffer_sparse_inter = MakeBuffer_L1(device, single_tile_size, single_tile_size, sizeof(T));
@@ -1270,12 +1248,14 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
     uint32_t extra_itr = 0;
     uint32_t idx = 0;
 
-    if(pattern_length % delta){
-        extra_itr = 1;
+    if(is_nr_enabled != 1){
+      if(pattern_length % delta){
+          extra_itr = 1;
+      }
+
+      loop_count = loop_count - extra_itr - (stride - 1);
     }
-
-    loop_count = loop_count - extra_itr - (stride - 1);
-
+    
     uint32_t ii = 0;
     for(uint32_t tile_id = 0; tile_id < n_tiles; tile_id++)
     {

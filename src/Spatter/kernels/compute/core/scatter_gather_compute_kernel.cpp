@@ -23,15 +23,18 @@ void MAIN {
     uint32_t single_tile_size =  get_arg_val<uint32_t>(6);
     uint32_t count = get_arg_val<uint32_t>(7);
     uint32_t wrap = get_arg_val<uint32_t>(8);
+    uint32_t is_nr_enabled = get_arg_val<uint32_t>(9);
 
     uint32_t loop_count = single_tile_size / delta_gather;
     uint32_t extra_itr = 0;
 
-    if(pattern_length % delta_gather){
-        extra_itr = 1;
-    }
+    if(is_nr_enabled != 1){
+        if(pattern_length % delta_gather){
+            extra_itr = 1;
+        }
 
-    loop_count = loop_count - extra_itr - (stride - 1);
+        loop_count = loop_count - extra_itr - (stride - 1);
+    }
 
     constexpr auto cb_sparse_gather = tt::CBIndex::c_0;
     constexpr auto cb_pattern_gather = tt::CBIndex::c_1;
@@ -56,15 +59,20 @@ void MAIN {
 
         volatile uint32_t* pattern_gather_ptr;
         cb_get_tile(cb_pattern_gather, 0, &pattern_gather_ptr);
+        pattern_gather_ptr = pattern_gather_ptr + 4; //Need to add 4 because read ptr is off by 1 << 4
 
         volatile uint32_t* pattern_scatter_ptr;
         cb_get_tile(cb_pattern_scatter, 0, &pattern_scatter_ptr);
+        pattern_scatter_ptr = pattern_scatter_ptr + 4;
     
         volatile uint32_t* sparse_scatter_tile_ptr;
         cb_get_tile(cb_sparse_scatter_inter, 0, &sparse_scatter_tile_ptr);
+        sparse_scatter_tile_ptr = sparse_scatter_tile_ptr + 4;
 
         volatile uint32_t* sparse_gather_ptr;
         cb_get_tile(cb_sparse_gather, 0, &sparse_gather_ptr);
+        sparse_gather_ptr = sparse_gather_ptr + 4;
+
 
         if((tile_id == (n_tiles_gather - 1)) && (extra_tile != 0)){
             loop_count = count - (tile_id * loop_count);
@@ -74,7 +82,7 @@ void MAIN {
             #pragma GCC unroll 8
             for (uint32_t j = 0; j < pattern_length; j++) {
                 // Write from gather to scatter
-                sparse_scatter_tile_ptr[4 + pattern_scatter_ptr[4 + j] + delta_scatter * i] = sparse_gather_ptr[4 + pattern_gather_ptr[4 + j] + delta_gather * i]; 
+                sparse_scatter_tile_ptr[pattern_scatter_ptr[j] + delta_scatter * i] = sparse_gather_ptr[pattern_gather_ptr[j] + delta_gather * i]; 
             }
         }
 

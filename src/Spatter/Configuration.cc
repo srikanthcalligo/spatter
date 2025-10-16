@@ -939,7 +939,7 @@ Configuration<Spatter::TT_Metalium>::Configuration(const size_t id,
     double *&dev_dense, size_t &dense_size,const size_t delta,
     const size_t delta_gather, const size_t delta_scatter, const long int seed,
     const size_t wrap, const size_t count, const unsigned long nruns,
-    const bool aggregate, const unsigned long verbosity, size_t tt_compute_mode, size_t tt_parallel_mode, size_t tt_core_id)
+    const bool aggregate, const unsigned long verbosity, size_t tt_compute_mode, size_t tt_parallel_mode, size_t tt_core_id, size_t tt_step_size, size_t tt_nr_enabled)
     : ConfigurationBase(id, name, kernel, pattern, pattern_gather,
           pattern_scatter, sparse, dev_sparse, sparse_size, sparse_gather,
           dev_sparse_gather, sparse_gather_size, sparse_scatter,
@@ -950,8 +950,10 @@ Configuration<Spatter::TT_Metalium>::Configuration(const size_t id,
 
   is_compute_mode_on = tt_compute_mode;
   is_parallel_mode_on = tt_parallel_mode;
-  
+  step_size = tt_step_size;
+  is_nr_enabled = tt_nr_enabled;  
   core_id = tt_core_id;
+  
   if(is_parallel_mode_on == 0){
     if((core_id >= 0) && (core_id < 64)){
       core = {core_id / 9, core_id % 9};
@@ -986,11 +988,13 @@ void Configuration<Spatter::TT_Metalium>::gather(bool timed, unsigned long run_i
   if(is_compute_mode_on) {
       kernel_exec_time = metalium_gather_wrapper<uint32_t>(pattern, sparse, dense,
                           pattern_length, delta, wrap, count, is_compute_mode_on, is_parallel_mode_on,
+                          step_size, is_nr_enabled,
                           core, device_id, device, cq, program, single_tile_size,
                           data_read_kernel_handle, data_write_kernel_handle, compute_kernel_handle);
   } else {
       kernel_exec_time = metalium_gather_wrapper<uint32_t>(pattern, sparse, dense,
                           pattern_length, delta, wrap, count, is_compute_mode_on, is_parallel_mode_on,
+                          step_size, is_nr_enabled,
                           core, device_id, device, cq, program, single_tile_size,
                           data_read_kernel_handle, 0, 0);
   }
@@ -1015,11 +1019,13 @@ void Configuration<Spatter::TT_Metalium>::scatter(bool timed, unsigned long run_
   if(is_compute_mode_on) {
       kernel_exec_time = metalium_scatter_wrapper<uint32_t>(pattern, sparse, dense,
                           pattern_length, delta, wrap, count, is_compute_mode_on, is_parallel_mode_on,
+                          step_size, is_nr_enabled,
                           core, device_id, device, cq, program, single_tile_size,
                           data_read_kernel_handle, data_write_kernel_handle, compute_kernel_handle);
   } else {
       kernel_exec_time = metalium_scatter_wrapper<uint32_t>(pattern, sparse, dense,
                           pattern_length, delta, wrap, count, is_compute_mode_on, is_parallel_mode_on,
+                          step_size, is_nr_enabled,
                           core, device_id, device, cq, program, single_tile_size,
                           data_read_kernel_handle, 0, 0);
   }
@@ -1045,6 +1051,7 @@ void Configuration<Spatter::TT_Metalium>::scatter_gather(bool timed, unsigned lo
       kernel_exec_time = metalium_scatter_gather_wrapper<uint32_t>(pattern_scatter,
                           sparse_scatter, pattern_gather, sparse_gather,
                           pattern_length, delta_scatter, delta_gather, wrap, count, is_compute_mode_on, is_parallel_mode_on,
+                          step_size, is_nr_enabled,
                           core, device_id, device, cq, program, single_tile_size,
                           data_read_kernel_handle, data_write_kernel_handle, compute_kernel_handle);
       
@@ -1078,11 +1085,13 @@ void Configuration<Spatter::TT_Metalium>::multi_gather(bool timed, unsigned long
   if(is_compute_mode_on) {
       kernel_exec_time = metalium_multi_gather_wrapper<uint32_t>(pattern, pattern_gather,
                           sparse, dense, pattern_length, delta, wrap, count, is_compute_mode_on, is_parallel_mode_on,
+                          step_size, is_nr_enabled,
                           core, device_id, device, cq, program, single_tile_size,
                           data_read_kernel_handle, data_write_kernel_handle, compute_kernel_handle);
   } else {
       kernel_exec_time = metalium_multi_gather_wrapper<uint32_t>(pattern, pattern_gather,
                           sparse, dense, pattern_length, delta, wrap, count, is_compute_mode_on, is_parallel_mode_on,
+                          step_size, is_nr_enabled,
                           core, device_id, device, cq, program, single_tile_size,
                           data_read_kernel_handle, 0, 0);
   }
@@ -1107,6 +1116,7 @@ void Configuration<Spatter::TT_Metalium>::multi_scatter(bool timed, unsigned lon
   if(is_compute_mode_on) {
       kernel_exec_time = metalium_multi_scatter_wrapper<uint32_t>(pattern, pattern_scatter,
                           sparse, dense, pattern_length, delta, wrap, count, is_compute_mode_on, is_parallel_mode_on,
+                          step_size, is_nr_enabled,
                           core, device_id, device, cq, program, single_tile_size,
                           data_read_kernel_handle, data_write_kernel_handle, compute_kernel_handle);
   } else {

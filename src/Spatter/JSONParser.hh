@@ -36,7 +36,7 @@ public:
       double *&dev_dense, size_t &dense_size, const std::string backend,
       const bool aggregate, const bool atomic, const bool compress,
       const size_t shared_mem, const int nthreads,
-      const unsigned long verbosity, size_t tt_compute_mode, size_t tt_parallel_mode, size_t tt_core_id, const std::string name = "",
+      const unsigned long verbosity, size_t tt_compute_mode, size_t tt_parallel_mode, size_t tt_core_id, size_t tt_step_size, size_t tt_nr_enabled, const std::string name = "",
       const std::string kernel = "gather", const size_t pattern_size = 0,
       const size_t delta = 8, const size_t delta_gather = 8,
       const size_t delta_scatter = 8, const size_t boundary = 0,
@@ -99,6 +99,9 @@ private:
   const unsigned long default_nruns_;
   size_t tt_compute_mode_; //TT-Metalium
   size_t tt_parallel_mode_; //TT-Metalium
+  size_t tt_core_id_; //TT-Metalium
+  size_t tt_step_size_; //TT-Metalium
+  size_t tt_nr_enabled_; //TT-Metalium
 };
 
 } // namespace Spatter

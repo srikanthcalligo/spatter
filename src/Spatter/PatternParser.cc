@@ -94,6 +94,7 @@ int generate_pattern_uniform(std::vector<std::string> args,
           throw std::invalid_argument("Invalid delta");
       }
 
+      //std::cout << new_delta << std::endl;
       delta = static_cast<size_t>(new_delta);
     }
   } catch (const std::invalid_argument &ia) {

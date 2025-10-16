@@ -5,7 +5,7 @@
 #include "JSONParser.hh"
 
 using json = nlohmann::json;
-
+//TT-Metalium : Added extra flags to class
 namespace Spatter {
 
 JSONParser::JSONParser(std::string filename, aligned_vector<double> &sparse,
@@ -17,7 +17,7 @@ JSONParser::JSONParser(std::string filename, aligned_vector<double> &sparse,
     aligned_vector<aligned_vector<double>> &dense_perthread, double *&dev_dense,
     size_t &dense_size, const std::string backend, const bool aggregate,
     const bool atomic, const bool compress, size_t shared_mem,
-    const int nthreads, const unsigned long verbosity, size_t tt_compute_mode, size_t tt_parallel_mode, size_t tt_core_id, const std::string name,
+    const int nthreads, const unsigned long verbosity, size_t tt_compute_mode, size_t tt_parallel_mode, size_t tt_core_id, size_t tt_step_size, size_t tt_nr_enabled, const std::string name,
     const std::string kernel, const size_t pattern_size, const size_t delta,
     const size_t delta_gather, const size_t delta_scatter,
     const size_t boundary, const long int seed, const size_t wrap,
@@ -35,7 +35,8 @@ JSONParser::JSONParser(std::string filename, aligned_vector<double> &sparse,
       default_delta_(delta), default_delta_gather_(delta_gather),
       default_delta_scatter_(delta_scatter), default_boundary_(boundary),
       default_seed_(seed), default_wrap_(wrap), default_count_(count),
-      default_local_work_size_(local_work_size), default_nruns_(nruns), tt_compute_mode_(tt_compute_mode), tt_parallel_mode_(tt_parallel_mode) {
+      default_local_work_size_(local_work_size), default_nruns_(nruns), tt_compute_mode_(tt_compute_mode), tt_parallel_mode_(tt_parallel_mode),
+      tt_core_id_(tt_core_id), tt_step_size_(tt_step_size), tt_nr_enabled_(tt_nr_enabled) {
   if (!file_exists_(filename)) {
     std::cerr << "File does not exist" << std::endl;
     exit(1);
@@ -201,7 +202,8 @@ std::unique_ptr<Spatter::ConfigurationBase> JSONParser::operator[](
         dev_sparse_scatter, sparse_scatter_size, dense, dense_perthread,
         dev_dense, dense_size, delta, delta_gather, delta_scatter,
         data_[index]["seed"], data_[index]["wrap"], data_[index]["count"],
-        data_[index]["nruns"], aggregate_, verbosity_, tt_compute_mode_, tt_parallel_mode_);
+        data_[index]["nruns"], aggregate_, verbosity_,
+        tt_compute_mode_, tt_parallel_mode_, tt_core_id_, tt_step_size_, tt_nr_enabled_); //TT-Metalium : Added extra flags 
 #endif
 #ifdef USE_OPENMP
   else if (backend_.compare("openmp") == 0)
@@ -245,6 +247,28 @@ int JSONParser::get_pattern_(const std::string &pattern_key,
 
     std::stringstream pattern_stream;
     pattern_stream << pattern_string;
+
+    //TT-Metalium : Added by Calligo
+    //TT-Metalium
+    std::string type, line;
+    std::vector<std::string> args;
+    pattern_stream.clear();
+    pattern_stream.seekg(0);
+    std::getline(pattern_stream, type, ':');
+    while (std::getline(pattern_stream, line, ':')){
+      args.push_back(line);
+    }
+    tt_step_size_ = std::stoll(args[1]);
+    if (args.size() == 3) {
+        if (args[2].compare("NR") == 0) {
+            tt_nr_enabled_ = 1;
+        }else{
+            tt_nr_enabled_ = 0;
+        }
+    }
+    pattern_stream.clear();
+    pattern_stream.seekg(0);
+    //End of Calligo changes
 
     return pattern_parser(pattern_stream, pattern, delta);
   } else {

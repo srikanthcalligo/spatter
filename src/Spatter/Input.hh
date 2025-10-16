@@ -85,6 +85,8 @@ struct ClArgs {
   size_t tt_compute_mode;
   size_t tt_parallel_mode;
   size_t tt_core_id;
+  size_t tt_step_size;
+  size_t tt_nr_enabled;
 
   void report_header() {
 #ifdef USE_MPI
@@ -307,6 +309,10 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
   int nthreads = 1;
 #endif
 
+  //TT-Metalium
+  std::string type, line;
+  std::vector<std::string> args;
+
   std::stringstream pattern_scatter_string;
   aligned_vector<size_t> pattern_scatter;
 
@@ -316,6 +322,8 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
   size_t tt_compute_mode = 0;
   size_t tt_parallel_mode = 0;
   size_t tt_core_id = 0;
+  size_t tt_nr_enabled = 0;
+  size_t tt_step_size = 1;
 
   size_t delta_gather = 8;
   size_t delta_scatter = 8;
@@ -448,6 +456,21 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
       pattern_string << optarg;
       if (pattern_parser(pattern_string, pattern, delta) != 0)
         return -1;
+
+      pattern_string.clear();
+      pattern_string.seekg(0);
+      std::getline(pattern_string, type, ':');
+      while (std::getline(pattern_string, line, ':')){
+        args.push_back(line);
+      }
+      cl.tt_step_size = std::stoll(args[1]);
+      if (args.size() == 3) {
+          if (args[2].compare("NR") == 0) {
+            cl.tt_nr_enabled = 1;
+          }else{
+            cl.tt_nr_enabled = 0;
+          }
+      }
       break;
 
     case 'r':
@@ -676,7 +699,7 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
           cl.dev_sparse_gather, cl.sparse_gather_size, cl.sparse_scatter,
           cl.dev_sparse_scatter, cl.sparse_scatter_size, cl.dense,
           cl.dense_perthread, cl.dev_dense, cl.dense_size, delta, delta_gather,
-          delta_scatter, seed, wrap, count, nruns, aggregate, verbosity, cl.tt_compute_mode, cl.tt_parallel_mode, cl.tt_core_id);
+          delta_scatter, seed, wrap, count, nruns, aggregate, verbosity, cl.tt_compute_mode, cl.tt_parallel_mode, cl.tt_core_id, cl.tt_step_size, cl.tt_nr_enabled);
 #endif
 #ifdef USE_OPENMP
     else if (backend.compare("openmp") == 0)
@@ -713,7 +736,7 @@ int parse_input(const int argc, char **argv, ClArgs &cl) {
         cl.sparse_gather_size, cl.sparse_scatter, cl.dev_sparse_scatter,
         cl.sparse_scatter_size, cl.dense, cl.dense_perthread, cl.dev_dense,
         cl.dense_size, backend, aggregate, atomic, compress, shared_mem,
-        nthreads, verbosity, cl.tt_compute_mode, cl.tt_parallel_mode, cl.tt_core_id);
+        nthreads, verbosity, cl.tt_compute_mode, cl.tt_parallel_mode, cl.tt_core_id, cl.tt_step_size, cl.tt_nr_enabled);
 #else
     Spatter::JSONParser json_file = Spatter::JSONParser(json_fname, cl.sparse,
         cl.dev_sparse, cl.sparse_size, cl.sparse_gather, cl.dev_sparse_gather,

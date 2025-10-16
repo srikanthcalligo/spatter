@@ -25,15 +25,18 @@ void MAIN {
     uint32_t single_tile_size =  get_arg_val<uint32_t>(9);
     uint32_t count = get_arg_val<uint32_t>(10);
     uint32_t wrap = get_arg_val<uint32_t>(11);
+    uint32_t is_nr_enabled = get_arg_val<uint32_t>(12);
+    
     uint32_t loop_count = single_tile_size / delta;
     uint32_t extra_itr = 0;
 
-    if(pattern_length % delta){
-        extra_itr = 1;
+    if(is_nr_enabled != 1){
+        if(pattern_length % delta){
+            extra_itr = 1;
+        }
+
+        loop_count = loop_count - extra_itr - (stride - 1);
     }
-
-    loop_count = loop_count - extra_itr - (stride - 1);
-
     constexpr auto cb_sparse = tt::CBIndex::c_0;
     constexpr auto cb_pattern = tt::CBIndex::c_1;
     constexpr auto cb_pattern_gather = tt::CBIndex::c_2;
@@ -51,18 +54,22 @@ void MAIN {
 
     volatile uint32_t* pattern_addr_ptr;
     cb_get_tile(cb_pattern, 0, &pattern_addr_ptr);
+    pattern_addr_ptr = pattern_addr_ptr + 4;  //Need to add 4 because read ptr is off by 1 << 4
 
     volatile uint32_t* pattern_gather_addr_ptr;
     cb_get_tile(cb_pattern_gather, 0, &pattern_gather_addr_ptr);
+    pattern_gather_addr_ptr = pattern_gather_addr_ptr + 4;
 
     volatile uint32_t* dense_addr_ptr;
     cb_get_tile(cb_dense_inter, 0, &dense_addr_ptr);
+    dense_addr_ptr = dense_addr_ptr + 4;
 
     for(uint32_t tile_id = num_tiles_written; tile_id < (num_tiles_written+num_output_tiles_per_core); tile_id++) {
         cb_wait_front(cb_sparse, 1);
         
         volatile uint32_t* sparse_addr_ptr;
         cb_get_tile(cb_sparse, 0, &sparse_addr_ptr);
+        sparse_addr_ptr = sparse_addr_ptr + 4;
 
         if((tile_id == (n_tiles - 1)) && (extra_tile != 0)){
             loop_count = count - (tile_id * loop_count);
@@ -71,7 +78,7 @@ void MAIN {
         for(uint32_t i = 0; i < loop_count; i++){
             #pragma GCC unroll 8
             for(uint32_t j = 0; j < pattern_length; j++){
-                dense_addr_ptr[4 + (j + pattern_length * (i % wrap))] = sparse_addr_ptr[4 + (pattern_addr_ptr[4 + pattern_gather_addr_ptr[4+j]] + delta * i)]; //Need to add 4 because read ptr is off by 1 << 4
+                dense_addr_ptr[(j + pattern_length * (i % wrap))] = sparse_addr_ptr[(pattern_addr_ptr[pattern_gather_addr_ptr[j]] + delta * i)];
             }
         }
        

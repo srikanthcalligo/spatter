@@ -21,16 +21,19 @@ void MAIN {
     uint32_t single_tile_size =  get_arg_val<uint32_t>(5);
     uint32_t count = get_arg_val<uint32_t>(6);
     uint32_t wrap = get_arg_val<uint32_t>(7);
+    uint32_t is_nr_enabled = get_arg_val<uint32_t>(8);
+    
     uint32_t loop_count = single_tile_size / delta;
     uint32_t extra_itr = 0;
 
-    if(pattern_length % delta){
-        extra_itr = 1;
+    if(is_nr_enabled != 1){
+        if(pattern_length % delta){
+            extra_itr = 1;
+        }
+        //Calculate loop count
+        loop_count = loop_count - extra_itr - (stride - 1);
     }
-
-    //Calculate loop count
-    loop_count = loop_count - extra_itr - (stride - 1);
-
+    
     constexpr auto cb_sparse = tt::CBIndex::c_0;
     constexpr auto cb_pattern = tt::CBIndex::c_1;
     constexpr auto cb_dense_inter = tt::CBIndex::c_2;

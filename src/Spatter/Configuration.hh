@@ -274,7 +274,7 @@ public:
       const size_t delta_gather, const size_t delta_scatter,
       const long int seed, const size_t wrap, const size_t count,
       const unsigned long nruns, const bool aggregate,
-      const unsigned long verbosity, size_t tt_compute_mode = 0, size_t tt_parallel_mode = 0, size_t tt_core_id = 0);
+      const unsigned long verbosity, size_t tt_compute_mode = 0, size_t tt_parallel_mode = 0, size_t tt_core_id = 0, size_t tt_step_size = 1, size_t tt_nr_enabled = 0);
 
 ~Configuration();
 
@@ -296,6 +296,8 @@ private:
   Program program = CreateProgram();
   uint32_t single_tile_size = 32 * 32; //TILE_WIDTH * TILE_HEIGHT
   uint32_t num_tiles_per_cb = 1;
+  size_t step_size;
+  size_t is_nr_enabled;
   CBHandle cb_sparse;
   CBHandle cb_dense;
   CBHandle cb_pattern;

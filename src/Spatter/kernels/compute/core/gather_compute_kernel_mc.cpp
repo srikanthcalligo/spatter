@@ -12,7 +12,7 @@ namespace NAMESPACE {
 void MAIN {
 
     //DeviceZoneScopedN("TEST-FULL");
-
+    //Read runtime parameters
     uint32_t n_tiles = get_arg_val<uint32_t>(0);
     uint32_t num_tiles_written = get_arg_val<uint32_t>(1);
     uint32_t num_output_tiles_per_core = get_arg_val<uint32_t>(2);
@@ -25,15 +25,18 @@ void MAIN {
     uint32_t single_tile_size =  get_arg_val<uint32_t>(9);
     uint32_t count = get_arg_val<uint32_t>(10);
     uint32_t wrap = get_arg_val<uint32_t>(11);
+    uint32_t is_nr_enabled = get_arg_val<uint32_t>(12);
+    
     uint32_t loop_count = single_tile_size / delta;
     uint32_t extra_itr = 0;
 
-    if(pattern_length % delta){
-        extra_itr = 1;
+    if(is_nr_enabled != 1){
+        if(pattern_length % delta){
+            extra_itr = 1;
+        }
+        //Calculate loop count
+        loop_count = loop_count - extra_itr - (stride - 1);
     }
-    //Calculating loop count
-    loop_count = loop_count - extra_itr - (stride - 1);
-
     //CB ids
     constexpr auto cb_sparse = tt::CBIndex::c_0;
     constexpr auto cb_pattern = tt::CBIndex::c_1;
@@ -69,14 +72,13 @@ void MAIN {
             loop_count = count - (tile_id * loop_count);
         }
 
-        for(uint32_t i = 0; i < loop_count; i = i + 1){
+        for(uint32_t i = 0; i < loop_count; i++){
             #pragma GCC unroll 8
             for(uint32_t j = 0; j < pattern_length; j++){
                 dense_addr_ptr[(j + pattern_length * (i % wrap))] = sparse_addr_ptr[(pattern_addr_ptr[j] + delta * i)];
             }
         }
-        
-        if((tile_id == (n_tiles - 1)) && (core_id == (num_cores - 1))){   
+        if((tile_id == (n_tiles - 1)) && (core_id == (num_cores - 1))){ 
             //write last tile data to the CB
             copy_tile(cb_dense_inter, 0, dst_reg);
             cb_reserve_back(cb_dense, 1);
