@@ -39,10 +39,13 @@ void MAIN {
     constexpr auto cb_dense_inter = tt::CBIndex::c_2;
     constexpr auto cb_dense = tt::CBIndex::c_3;
     constexpr uint32_t dst_reg = 0;
+    uint32_t sparse_index = 0, dense_index = 0;
 
     unary_op_init_common(cb_dense_inter, cb_dense);
     copy_tile_init(cb_dense_inter);
     
+    //DPRINT << "Compute Core Version" << ENDL();
+
     for(uint32_t tile_id = 0; tile_id < n_tiles; tile_id++)
     {
         acquire_dst();
@@ -69,9 +72,12 @@ void MAIN {
         }
 
         for(uint32_t i = 0; i < loop_count; i++){
+            sparse_index = delta * i;
+            dense_index = pattern_length * (i % wrap);
             #pragma GCC unroll 8
             for(uint32_t j = 0; j < pattern_length; j++){
-                dense_addr_ptr[(j + pattern_length * (i % wrap))] = sparse_addr_ptr[(pattern_addr_ptr[j] + delta * i)];
+                //dense_addr_ptr[(j + pattern_length * (i % wrap))] = sparse_addr_ptr[(pattern_addr_ptr[j] + delta * i)];
+                dense_addr_ptr[j + dense_index] = sparse_addr_ptr[(j * stride + sparse_index)]; //Calculate index from stride directly.
             }
         }
        
@@ -94,3 +100,4 @@ void MAIN {
     }
 }
 }
+
