@@ -697,6 +697,7 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
     }
     
     n_tiles_gather = n_tiles_gather + req_tiles;
+    n_tiles_scatter = n_tiles_scatter + req_tiles;
 
 #ifdef PRINT_DEBUG
     std::cout << "Tiles gather: " << n_tiles_gather
