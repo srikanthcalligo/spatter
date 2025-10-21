@@ -66,7 +66,7 @@ void MAIN {
         
         volatile uint32_t* sparse_addr_ptr;
         cb_get_tile(cb_sparse, 0, &sparse_addr_ptr);
-        sparse_addr_ptr = sparse_addr_ptr + 4
+        sparse_addr_ptr = sparse_addr_ptr + 4;
         
         ///DPRINT << "Got tile ptr=" << (uint32_t)sparse_addr_ptr << ENDL();
 
