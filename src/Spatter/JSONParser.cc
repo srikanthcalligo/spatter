@@ -272,7 +272,18 @@ int JSONParser::get_pattern_(const std::string &pattern_key,
 
     return pattern_parser(pattern_stream, pattern, delta);
   } else {
+    tt_nr_enabled_ = 0;
     pattern = data_[index][pattern_key].template get<aligned_vector<size_t>>();
+    if(pattern.size() > 0){
+      tt_step_size_ = abs(int(pattern[1] - pattern[0]));
+    	for(size_t i = 0; i < (pattern.size() - 1); i++ )
+    	{
+    		if((pattern[i] >= 1024) || (abs(int(pattern[i + 1] - pattern[i])) != tt_step_size_)){
+    			printf("ERror :: Pattern index value is greater than the tile size or non uniform index\n");
+    			exit(0);
+    		}    		
+    	}
+    }
     return 0;
   }
 }

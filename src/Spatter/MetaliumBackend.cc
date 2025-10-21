@@ -569,16 +569,15 @@ double metalium_scatter_wrapper(const aligned_vector<size_t> &pattern, aligned_v
     }
 
     //TT Test  
-    uint32_t loop_count = single_tile_size / delta;
-    uint32_t extra_itr = 0;
-    uint32_t idx = 0;
-    
-    if(is_nr_enabled != 1){
-      if(pattern_length % delta){
-          extra_itr = 1;
-      }
+    uint32_t loop_count = 0;
+    if(delta){
+        loop_count =  (single_tile_size - ((pattern_length - 1) * stride)) / delta;
 
-      loop_count = loop_count - extra_itr - (stride - 1);
+        if((single_tile_size - ((pattern_length - 1) * stride)) % delta){
+            loop_count = loop_count + 1;
+        }
+    } else {
+        loop_count = count;
     }
 
     unsigned long ii = 0;
