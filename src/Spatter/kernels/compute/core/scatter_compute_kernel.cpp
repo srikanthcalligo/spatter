@@ -23,14 +23,15 @@ void MAIN {
     uint32_t count = get_arg_val<uint32_t>(6);
     uint32_t wrap = get_arg_val<uint32_t>(7);
     uint32_t is_nr_enabled = get_arg_val<uint32_t>(8);
-    uint32_t loop_count = single_tile_size / delta;
-    uint32_t extra_itr = 0;
-    if(is_nr_enabled != 1){
-        if(pattern_length % delta){
-            extra_itr = 1;
-        }
+    uint32_t loop_count = 0;
+    if(delta){
+        loop_count =  (single_tile_size - ((pattern_length - 1) * stride)) / delta;
 
-        loop_count = loop_count - extra_itr - (stride - 1);
+        if((single_tile_size - ((pattern_length - 1) * stride)) % delta){
+            loop_count = loop_count + 1;
+        }
+    } else {
+        loop_count = count;
     }
     constexpr auto cb_dense = tt::CBIndex::c_0;
     constexpr auto cb_pattern = tt::CBIndex::c_1;
@@ -64,6 +65,9 @@ void MAIN {
         
         if((tile_id == (n_tiles - 1)) && (extra_tile != 0)){
             loop_count = count - (tile_id * loop_count);
+            if((int)loop_count < 0){
+                loop_count = 0;
+            }
         }
 
         for(uint32_t i = 0; i < loop_count; i++){
