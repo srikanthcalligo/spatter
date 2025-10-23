@@ -396,7 +396,7 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
     if(pass == 0){
       printf("\nTest Passed.\n");
     } else {
-      printf("\nTest Failed. For Pattern Length = %ld Step = %d\n", pattern_length, (int)step_size);
+      printf("\nTest Failed. For Pattern_Length = %ld and Step_Size = %d\n", pattern_length, (int)step_size);
     }
     printf("\n");
 #endif
@@ -610,7 +610,7 @@ double metalium_scatter_wrapper(const aligned_vector<size_t> &pattern, aligned_v
     if(pass == 0){
       printf("\nTest Passed.\n");
     } else {
-      printf("\nTest Failed. For Pattern Length = %ld Step = %d\n", pattern_length, (int)step_size);
+      printf("\nTest Failed. For Pattern_Length = %ld and Step_Size = %d\n", pattern_length, (int)step_size);
     }
     printf("\n");
 #endif
@@ -647,7 +647,25 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
     std::vector<uint32_t> dev_pattern_scatter(single_tile_size);
     std::vector<uint32_t> dev_sparse_scatter(n_tiles_scatter * single_tile_size);
 
-    uint32_t stride = pattern_gather[1];
+    uint32_t stride_gather = abs(int(pattern_gather[1] - pattern_gather[0]));
+    uint32_t stride_scatter = abs(int(pattern_scatter[1] - pattern_scatter[0]));
+    for(size_t i = 0; i < (pattern_length - 1); i++ )
+    {
+    	if((pattern_gather[i] >= 1024) || (abs(int(pattern_gather[i + 1] - pattern_gather[i])) != stride_gather)){
+    		printf("Error :: Pattern index value is greater than the tile size or non uniform index\n");
+    		exit(0);
+    	}
+      if((pattern_scatter[i] >= 1024) || (abs(int(pattern_scatter[i + 1] - pattern_scatter[i])) != stride_scatter)){
+    		printf("Error :: Pattern index value is greater than the tile size or non uniform index\n");
+    		exit(0);
+    	}    		
+    }
+
+    if(stride_gather !=  stride_scatter){
+      printf("Step size for scatter(-u) and gather(-g) should be Equal\n");
+      exit(0);
+    }
+
     uint32_t iin = 0, icn = 1;
     uint32_t extra_tile = sparse_gather.size() % single_tile_size;
     uint32_t no_cores = 1;
@@ -664,7 +682,7 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
     while(i < count){
       for (size_t j = 0; j < pattern_length; j++) {
         inc = pattern_gather[j] + delta_gather * i;                    
-        if((i*delta_gather+(pattern_length - 1) * stride) >= (iter * single_tile_size)){
+        if((i*delta_gather+(pattern_length - 1) * stride_gather) >= (iter * single_tile_size)){
                     icn1 = icn1 + (iter * 1024) - (i * delta_gather);
                     iter = iter + 1;
         }        
@@ -759,7 +777,7 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
                 num_tiles_written,
                 num_output_tiles_per_core});
 
-            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles_gather, pattern_length, delta_gather, delta_scatter, extra_tile, stride, single_tile_size, count, wrap, num_tiles_written, num_output_tiles_per_core});
+            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles_gather, pattern_length, delta_gather, delta_scatter, extra_tile, stride_gather, stride_scatter, single_tile_size, count, wrap, num_tiles_written, num_output_tiles_per_core});
             SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_sparse_scatter->address(), n_tiles_scatter, num_tiles_written, num_output_tiles_per_core});
           }else{
             printf("TBD\n");
@@ -772,7 +790,7 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
         //  dram_buffer_sparse_scatter = MakeBuffer(device, single_tile_size, single_tile_size, sizeof(uint32_t));
         if(is_compute_mode_on){
           SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_sparse_gather->address(), dram_buffer_pattern_gather->address(),  dram_buffer_pattern_scatter->address(), dram_buffer_sparse_inter->address(), n_tiles_gather});
-          SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles_gather, pattern_length, delta_gather, delta_scatter, extra_tile, stride, single_tile_size, count, wrap});
+          SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles_gather, pattern_length, delta_gather, delta_scatter, extra_tile, stride_gather, stride_scatter, single_tile_size, count, wrap});
           SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_sparse_scatter->address(), n_tiles_scatter});
         } else {
           printf("TBD\n");
@@ -809,16 +827,15 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
     //TT Test
     std::vector<T> sparse_scatter_test(sparse_scatter.size());
   
-    uint32_t loop_count = single_tile_size / delta_gather;
-    uint32_t extra_itr = 0;
-    uint32_t idx = 0;
+    uint32_t loop_count = 0;
+    if(delta_gather){
+        loop_count =  (single_tile_size - ((pattern_length - 1) * stride_gather)) / delta_gather;
 
-    if(is_nr_enabled != 1){
-      if(pattern_length % delta_gather){
-          extra_itr = 1;
-      }
-
-      loop_count = loop_count - extra_itr - (stride - 1);
+        if((single_tile_size - ((pattern_length - 1) * stride_gather)) % delta_gather){
+            loop_count = loop_count + 1;
+        }
+    } else {
+        loop_count = count;
     }
 
     uint32_t ii = 0;
@@ -851,7 +868,7 @@ double metalium_scatter_gather_wrapper(const aligned_vector<size_t> &pattern_sca
     if(pass == 0){
       printf("\nTest Passed.\n");
     } else {
-      printf("\nTest Failed.\n");
+      printf("\nTest Failed. For Pattern_Length = %ld and Step_Size = %d\n", pattern_length, (int)stride_gather);
     }
     printf("\n");
       
@@ -1244,16 +1261,15 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
     //TT Test
     std::vector<T> sparse_test(single_tile_size * n_tiles);
   
-    uint32_t loop_count = single_tile_size / delta;
-    uint32_t extra_itr = 0;
-    uint32_t idx = 0;
+    uint32_t loop_count = 0;
+    if(delta){
+        loop_count =  (single_tile_size - ((pattern_length - 1) * stride)) / delta;
 
-    if(is_nr_enabled != 1){
-      if(pattern_length % delta){
-          extra_itr = 1;
-      }
-
-      loop_count = loop_count - extra_itr - (stride - 1);
+        if((single_tile_size - ((pattern_length - 1) * stride)) % delta){
+            loop_count = loop_count + 1;
+        }
+    } else {
+        loop_count = count;
     }
     
     uint32_t ii = 0;
