@@ -331,7 +331,7 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
             num_tiles_written,
             num_output_tiles_per_core});
 
-            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, num_tiles_written, num_output_tiles_per_core, i, num_cores, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap, is_nr_enabled});
+            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, num_tiles_written, num_output_tiles_per_core, i, num_cores, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
             SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_dense->address(), i, num_cores});
           }else{
             SetRuntimeArgs(program,
@@ -351,7 +351,7 @@ double metalium_gather_wrapper(const aligned_vector<size_t> &pattern, const alig
         dram_buffer_dense = MakeBuffer(device, single_tile_size, single_tile_size, sizeof(uint32_t));
         if(is_compute_mode_on){
           SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_sparse->address(), dram_buffer_pattern->address(), dram_buffer_compute_pattern->address(), n_tiles});
-          SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap, is_nr_enabled});
+          SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
           SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_dense->address()}); //Return only the final tile
         } else {
           SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_sparse->address(), dram_buffer_pattern->address(), dram_buffer_dense->address(), n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
@@ -519,7 +519,7 @@ double metalium_scatter_wrapper(const aligned_vector<size_t> &pattern, aligned_v
           }
           if(is_compute_mode_on){
             SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_dense->address(), dram_buffer_pattern->address(), dram_buffer_sparse_inter->address(), n_tiles, num_tiles_written, num_output_tiles_per_core});
-            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap, num_tiles_written, num_output_tiles_per_core, is_nr_enabled});
+            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap, num_tiles_written, num_output_tiles_per_core});
             SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_sparse->address(), n_tiles, num_tiles_written, num_output_tiles_per_core});
           }else{
             SetRuntimeArgs(program, data_read_kernel_handle, core,
@@ -534,7 +534,7 @@ double metalium_scatter_wrapper(const aligned_vector<size_t> &pattern, aligned_v
 
           if(is_compute_mode_on){
             SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_dense->address(), dram_buffer_pattern->address(), dram_buffer_sparse_inter->address(), n_tiles});
-            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap, is_nr_enabled});
+            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
             SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_sparse->address(), n_tiles});
           } else {
             SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_dense->address(), dram_buffer_pattern->address(), dram_buffer_sparse->address(), n_tiles,pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
@@ -903,7 +903,19 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
     std::vector<uint32_t> dev_pattern_gather(single_tile_size);
     std::vector<uint32_t> compute_pattern(single_tile_size);
 
-    uint32_t stride = pattern[pattern_gather[1]];
+    uint32_t stride = abs(int(pattern[1] - pattern[0]));
+    uint32_t stride_gather = abs(int(pattern_gather[1] - pattern_gather[0]));
+    for(size_t i = 0; i < (pattern_length - 1); i++ )
+    {
+    	if((pattern[i] >= 1024) || (abs(int(pattern[i + 1] - pattern[i])) != stride)){
+    		printf("Error :: Pattern index value is greater than the tile size or non uniform index\n");
+    		exit(0);
+    	}
+      if((pattern_gather[i] >= 1024) || (abs(int(pattern_gather[i + 1] - pattern_gather[i])) != stride_gather)){
+    		printf("Error :: Pattern index value is greater than the tile size or non uniform index\n");
+    		exit(0);
+    	}    		
+    }
 
     uint32_t iin = 0, icn = 1;
     uint32_t extra_tile = sparse.size() % single_tile_size;
@@ -1014,7 +1026,7 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
             num_tiles_written,
             num_output_tiles_per_core});
 
-            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, num_tiles_written, num_output_tiles_per_core, i, num_cores, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
+            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, num_tiles_written, num_output_tiles_per_core, i, num_cores, pattern_length, delta, extra_tile, stride, stride_gather, single_tile_size, count, wrap});
             SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_dense->address(), i, num_cores});
           }else{
             SetRuntimeArgs(program,
@@ -1034,7 +1046,7 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
       //Output buffer creation in DRAM
        if(is_compute_mode_on){
           SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_sparse->address(), dram_buffer_pattern->address(), dram_buffer_pattern_gather->address(), dram_buffer_compute_pattern->address(), n_tiles});
-          SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
+          SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, stride_gather, single_tile_size, count, wrap});
           SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_dense->address()}); //Return only the final tile
         } else {
           SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_sparse->address(), dram_buffer_pattern->address(), dram_buffer_pattern_gather->address(), dram_buffer_dense->address(), n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
@@ -1073,7 +1085,7 @@ double metalium_multi_gather_wrapper(const aligned_vector<size_t> &pattern,
     }
      
      if(fail_count)
-        printf("\nTest Failed.\n");
+        printf("\nTest Failed. For Pattern_Length = %ld and Step_Size = %d\n", pattern_length, (int)stride);
       else
         printf("\nTest Passed.\n");
     
@@ -1113,7 +1125,22 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
     std::vector<T> dev_pattern(single_tile_size);
     std::vector<T> dev_pattern_scatter(single_tile_size);
 
-    uint32_t stride = pattern[1];
+    //uint32_t stride = pattern[1];
+
+    uint32_t stride_pattern = abs(int(pattern[1] - pattern[0]));
+    uint32_t stride_scatter = abs(int(pattern_scatter[1] - pattern_scatter[0]));
+    for(size_t i = 0; i < (pattern_length - 1); i++ )
+    {
+    	if((pattern[i] >= 1024) || (abs(int(pattern[i + 1] - pattern[i])) != stride_pattern)){
+    		printf("Error :: Pattern index value is greater than the tile size or non uniform index\n");
+    		exit(0);
+    	}
+      if((pattern_scatter[i] >= 1024) || (abs(int(pattern_scatter[i + 1] - pattern_scatter[i])) != stride_scatter)){
+    		printf("Error :: Pattern index value is greater than the tile size or non uniform index\n");
+    		exit(0);
+    	}    		
+    }
+
     uint32_t remainder = single_tile_size % pattern_length;
     uint32_t extra_tile = sparse.size() % single_tile_size;
 
@@ -1203,7 +1230,7 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
           }
           if(is_compute_mode_on){
             SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_dense->address(), dram_buffer_pattern->address(), dram_buffer_sparse_inter->address(), dram_buffer_pattern_scatter->address(), n_tiles, num_tiles_written, num_output_tiles_per_core});
-            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap, num_tiles_written, num_output_tiles_per_core});
+            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride_pattern, stride_scatter, single_tile_size, count, wrap, num_tiles_written, num_output_tiles_per_core});
             SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_sparse->address(), n_tiles, num_tiles_written, num_output_tiles_per_core});
           }else{
             SetRuntimeArgs(program, data_read_kernel_handle, core,
@@ -1218,7 +1245,7 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
               num_output_tiles_per_core, 
               i,
               single_tile_size,
-              remainder, stride, count, dram_buffer_pattern_scatter->address()});
+              remainder, stride_pattern, count, dram_buffer_pattern_scatter->address()});
           }
           num_tiles_written += num_output_tiles_per_core;
       }
@@ -1226,10 +1253,10 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
 
           if(is_compute_mode_on){
             SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_dense->address(), dram_buffer_pattern->address(), dram_buffer_sparse_inter->address(), dram_buffer_pattern_scatter->address(), n_tiles});
-            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride, single_tile_size, count, wrap});
+            SetRuntimeArgs(program, compute_kernel_handle, core, {n_tiles, pattern_length, delta, extra_tile, stride_pattern, stride_scatter, single_tile_size, count, wrap});
             SetRuntimeArgs(program, data_write_kernel_handle, core, {dram_buffer_sparse->address(), n_tiles});
           } else {
-            SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_dense->address(), dram_buffer_pattern->address(), n_tiles, dram_buffer_sparse->address(), pattern_length, delta, wrap, single_tile_size, extra_tile, stride, count, dram_buffer_pattern_scatter->address()});
+            SetRuntimeArgs(program, data_read_kernel_handle, core, {dram_buffer_dense->address(), dram_buffer_pattern->address(), n_tiles, dram_buffer_sparse->address(), pattern_length, delta, wrap, single_tile_size, extra_tile, stride_pattern, count, dram_buffer_pattern_scatter->address()});
           }
 
     }
@@ -1263,9 +1290,9 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
   
     uint32_t loop_count = 0;
     if(delta){
-        loop_count =  (single_tile_size - ((pattern_length - 1) * stride)) / delta;
+        loop_count =  (single_tile_size - ((pattern_length - 1) * stride_pattern)) / delta;
 
-        if((single_tile_size - ((pattern_length - 1) * stride)) % delta){
+        if((single_tile_size - ((pattern_length - 1) * stride_pattern)) % delta){
             loop_count = loop_count + 1;
         }
     } else {
@@ -1302,7 +1329,7 @@ double metalium_multi_scatter_wrapper(const aligned_vector<size_t> &pattern,
     if(pass == 0){
       printf("\nTest Passed.\n");
     } else {
-      printf("\nTest Failed.\n");
+      printf("\nTest Failed. For Pattern_Length = %ld and Step_Size = %d\n", pattern_length, (int)stride_pattern);
     }
     printf("\n");
 #endif

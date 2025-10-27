@@ -26,13 +26,13 @@ void MAIN {
     uint32_t wrap = get_arg_val<uint32_t>(9);
     uint32_t num_tiles_written = get_arg_val<uint32_t>(10);
     uint32_t num_output_tiles_per_core = get_arg_val<uint32_t>(11);
-    uint32_t is_nr_enabled = get_arg_val<uint32_t>(12);
     
+    uint32_t loop_calc_count = (single_tile_size - ((pattern_length - 1) * stride_gather));
     uint32_t loop_count = 0;
     if(delta_gather){
-        loop_count =  (single_tile_size - ((pattern_length - 1) * stride_gather)) / delta_gather;
+        loop_count =  loop_calc_count / delta_gather;
 
-        if((single_tile_size - ((pattern_length - 1) * stride_gather)) % delta_gather){
+        if(loop_calc_count % delta_gather){
             loop_count = loop_count + 1;
         }
     } else {

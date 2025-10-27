@@ -24,13 +24,13 @@ void MAIN {
     uint32_t single_tile_size =  get_arg_val<uint32_t>(7);
     uint32_t count = get_arg_val<uint32_t>(8);
     uint32_t wrap = get_arg_val<uint32_t>(9);
-    uint32_t is_nr_enabled = get_arg_val<uint32_t>(10);
-
+    
+    uint32_t loop_calc_count = (single_tile_size - ((pattern_length - 1) * stride_gather));
     uint32_t loop_count = 0;
     if(delta_gather){
-        loop_count =  (single_tile_size - ((pattern_length - 1) * stride_gather)) / delta_gather;
+        loop_count =  loop_calc_count / delta_gather;
 
-        if((single_tile_size - ((pattern_length - 1) * stride_gather)) % delta_gather){
+        if(loop_calc_count % delta_gather){
             loop_count = loop_count + 1;
         }
     } else {

@@ -21,12 +21,13 @@ void MAIN {
     uint32_t single_tile_size =  get_arg_val<uint32_t>(5);
     uint32_t count = get_arg_val<uint32_t>(6);
     uint32_t wrap = get_arg_val<uint32_t>(7);
-    uint32_t is_nr_enabled = get_arg_val<uint32_t>(8);
+    
+    uint32_t loop_calc_count = (single_tile_size - ((pattern_length - 1) * stride));
     uint32_t loop_count = 0;
     if(delta){
-        loop_count =  (single_tile_size - ((pattern_length - 1) * stride)) / delta;
+        loop_count =  loop_calc_count / delta;
 
-        if((single_tile_size - ((pattern_length - 1) * stride)) % delta){
+        if(loop_calc_count % delta){
             loop_count = loop_count + 1;
         }
     } else {
@@ -74,11 +75,14 @@ void MAIN {
         }
 
         for(uint32_t i = 0; i < loop_count; i++){
+            //optimized version
             sparse_index = delta * i;
-            dense_index = pattern_length * (i % wrap);
+            dense_index = (pattern_length * (i % wrap));
             #pragma GCC unroll 8
             for(uint32_t j = 0; j < pattern_length; j++){
+                //Default version
                 //dense_addr_ptr[(j + pattern_length * (i % wrap))] = sparse_addr_ptr[(pattern_addr_ptr[j] + delta * i)];
+                //optimized version
                 dense_addr_ptr[j + dense_index] = sparse_addr_ptr[(j * stride + sparse_index)]; //Calculate index from stride directly.
             }
         }

@@ -22,50 +22,53 @@ void MAIN {
     uint32_t delta =  get_arg_val<uint32_t>(6);
     uint32_t extra_tile =  get_arg_val<uint32_t>(7);
     uint32_t stride =  get_arg_val<uint32_t>(8);
-    uint32_t single_tile_size =  get_arg_val<uint32_t>(9);
-    uint32_t count = get_arg_val<uint32_t>(10);
-    uint32_t wrap = get_arg_val<uint32_t>(11);
-    uint32_t is_nr_enabled = get_arg_val<uint32_t>(12);
+    uint32_t stride_gather   = get_arg_val<uint32_t>(9);
+    uint32_t single_tile_size =  get_arg_val<uint32_t>(10);
+    uint32_t count = get_arg_val<uint32_t>(11);
+    uint32_t wrap = get_arg_val<uint32_t>(12);
     
-    uint32_t loop_count = single_tile_size / delta;
-    uint32_t extra_itr = 0;
+    uint32_t loop_calc_count = (single_tile_size - ((pattern_length - 1) * stride));
+    uint32_t loop_count = 0;
+    if(delta){
+        loop_count =  loop_calc_count / delta;
 
-    if(is_nr_enabled != 1){
-        if(pattern_length % delta){
-            extra_itr = 1;
+        if(loop_calc_count % delta){
+            loop_count = loop_count + 1;
         }
-
-        loop_count = loop_count - extra_itr - (stride - 1);
+    } else {
+        loop_count = count;
     }
+
     constexpr auto cb_sparse = tt::CBIndex::c_0;
     constexpr auto cb_pattern = tt::CBIndex::c_1;
     constexpr auto cb_pattern_gather = tt::CBIndex::c_2;
     constexpr auto cb_dense_inter = tt::CBIndex::c_3;
     constexpr auto cb_dense = tt::CBIndex::c_4;
     constexpr uint32_t dst_reg = 0;
+    uint32_t sparse_index = 0, dense_index = 0;
 
     unary_op_init_common(cb_dense_inter, cb_dense);
     copy_tile_init(cb_dense_inter);
-    acquire_dst();
-
-    cb_wait_front(cb_pattern, 1);
-    cb_wait_front(cb_pattern_gather, 1);
-    cb_wait_front(cb_dense_inter, 1);
-
-    volatile uint32_t* pattern_addr_ptr;
-    cb_get_tile(cb_pattern, 0, &pattern_addr_ptr);
-    pattern_addr_ptr = pattern_addr_ptr + 4;  //Need to add 4 because read ptr is off by 1 << 4
-
-    volatile uint32_t* pattern_gather_addr_ptr;
-    cb_get_tile(cb_pattern_gather, 0, &pattern_gather_addr_ptr);
-    pattern_gather_addr_ptr = pattern_gather_addr_ptr + 4;
-
-    volatile uint32_t* dense_addr_ptr;
-    cb_get_tile(cb_dense_inter, 0, &dense_addr_ptr);
-    dense_addr_ptr = dense_addr_ptr + 4;
-
+    
     for(uint32_t tile_id = num_tiles_written; tile_id < (num_tiles_written+num_output_tiles_per_core); tile_id++) {
+        acquire_dst();
         cb_wait_front(cb_sparse, 1);
+
+        cb_wait_front(cb_pattern, 1);
+        cb_wait_front(cb_pattern_gather, 1);
+        cb_wait_front(cb_dense_inter, 1);
+
+        volatile uint32_t* pattern_addr_ptr;
+        cb_get_tile(cb_pattern, 0, &pattern_addr_ptr);
+        pattern_addr_ptr = pattern_addr_ptr + 4;  //Need to add 4 because read ptr is off by 1 << 4
+
+        volatile uint32_t* pattern_gather_addr_ptr;
+        cb_get_tile(cb_pattern_gather, 0, &pattern_gather_addr_ptr);
+        pattern_gather_addr_ptr = pattern_gather_addr_ptr + 4;
+
+        volatile uint32_t* dense_addr_ptr;
+        cb_get_tile(cb_dense_inter, 0, &dense_addr_ptr);
+        dense_addr_ptr = dense_addr_ptr + 4;
         
         volatile uint32_t* sparse_addr_ptr;
         cb_get_tile(cb_sparse, 0, &sparse_addr_ptr);
@@ -73,31 +76,39 @@ void MAIN {
 
         if((tile_id == (n_tiles - 1)) && (extra_tile != 0)){
             loop_count = count - (tile_id * loop_count);
+            if((int)loop_count < 0){
+                loop_count = 0;
+            }
         }
 
         for(uint32_t i = 0; i < loop_count; i++){
+            //optimized version
+            dense_index = (pattern_length * (i % wrap));
+            sparse_index = delta * i;
             #pragma GCC unroll 8
             for(uint32_t j = 0; j < pattern_length; j++){
-                dense_addr_ptr[(j + pattern_length * (i % wrap))] = sparse_addr_ptr[(pattern_addr_ptr[pattern_gather_addr_ptr[j]] + delta * i)];
+                //optimized version
+                dense_addr_ptr[j + dense_index] = sparse_addr_ptr[((j * stride_gather) * stride) + sparse_index];
+                //Default version
+                //dense_addr_ptr[(j + pattern_length * (i % wrap))] = sparse_addr_ptr[(pattern_addr_ptr[pattern_gather_addr_ptr[j]] + delta * i)];
             }
         }
        
-        cb_pop_front(cb_sparse, 1);   
+        if((tile_id == (n_tiles - 1)) && (core_id == (num_cores - 1))){   
+            //write last tile data to the CB
+            copy_tile(cb_dense_inter, 0, dst_reg);
+        
+            cb_reserve_back(cb_dense, 1);
+
+            pack_tile(dst_reg, cb_dense);
+        
+            cb_push_back(cb_dense, 1);
+        }
+        cb_pop_front(cb_sparse, 1);
+        cb_pop_front(cb_pattern, 1);
+        cb_pop_front(cb_pattern_gather, 1);
+        cb_pop_front(cb_dense_inter, 1);
+        release_dst();
     }
-
-    if(core_id == (num_cores - 1)){   
-        //write last tile data to the CB
-        copy_tile(cb_dense_inter, 0, dst_reg);
-    
-        cb_reserve_back(cb_dense, 1);
-
-        pack_tile(dst_reg, cb_dense);
-    
-        cb_push_back(cb_dense, 1);
-    }    
-    release_dst();
-    cb_pop_front(cb_pattern, 1);
-    cb_pop_front(cb_pattern_gather, 1);
-    cb_pop_front(cb_dense_inter, 1);
 }
 }
